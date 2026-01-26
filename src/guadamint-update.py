@@ -75,8 +75,8 @@ def main():
         pass 
     # -----------------------------
 
-    # 2. ESPERA DE SEGURIDAD (10-60 segundos)
-    wait_time = random.randint(10, 60)
+    # 2. ESPERA DE SEGURIDAD (5-5 segundos)
+    wait_time = random.randint(5-5)
     log_y_print(f">>> Esperando {wait_time} segundos antes de actualizar...")
     time.sleep(wait_time)
 
