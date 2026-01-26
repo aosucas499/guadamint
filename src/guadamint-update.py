@@ -65,21 +65,4 @@ def main():
     log_y_print("=== INICIO SERVICIO GUADAMINT ===")
     
     # 1. DETECCIÓN DE ESCRITORIO
-    tipo_escritorio = detectar_escritorio()
-    log_y_print(f">>> Entorno detectado: {tipo_escritorio}")
-
-    # --- TU CÓDIGO FUTURO AQUÍ ---
-    if tipo_escritorio == "XFCE":
-        pass 
-    elif tipo_escritorio == "CINNAMON":
-        pass 
-    # -----------------------------
-
-    # 2. ESPERA DE SEGURIDAD (5-5 segundos)
-    wait_time = random.randint(5-5)
-    log_y_print(f">>> Esperando {wait_time} segundos antes de actualizar...")
-    time.sleep(wait_time)
-
-    # 3. GESTIÓN DE LOCK FILE
-    try:
-        with open(LOCK_FILE, 'w') as f: f
+    tipo
