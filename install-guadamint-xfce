@@ -1,0 +1,36 @@
+#!/bin/bash
+
+# Comprobación de root
+if [ "$EUID" -ne 0 ]; then
+  echo "Por favor, ejecuta como root (sudo ./install-guadamint-xfce.sh)"
+  exit 1
+fi
+
+echo ">>> Instalando sistema de actualizaciones GuadaMint..."
+
+# 1. Definir rutas
+SOURCE_DIR=$(dirname "$0") # Directorio donde está este script
+DEST_BIN="/usr/bin/guadamint-updater.py"
+DEST_SERVICE="/etc/systemd/system/guadamint-updater.service"
+
+# 2. Copiar el script Python
+echo "Copiando script Python a $DEST_BIN..."
+cp "$SOURCE_DIR/guadamint-updater.py" "$DEST_BIN"
+chmod 755 "$DEST_BIN" # Permisos de ejecución
+
+# 3. Copiar el servicio Systemd
+echo "Copiando servicio a $DEST_SERVICE..."
+cp "$SOURCE_DIR/guadamint-updater.service" "$DEST_SERVICE"
+chmod 644 "$DEST_SERVICE" # Permisos estándar para unidades systemd
+
+# 4. Crear directorio de logs (opcional, pero recomendado para evitar errores de permisos)
+mkdir -p /var/log/guadamint/
+chmod 755 /var/log/guadamint/
+
+# 5. Activar el servicio
+echo "Habilitando servicio systemd..."
+systemctl daemon-reload
+systemctl enable guadamint-updater.service
+
+echo ">>> Instalación completada."
+echo "El sistema buscará actualizaciones en cada reinicio."
