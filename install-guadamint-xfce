@@ -1,31 +1,36 @@
 #!/bin/bash
 
-# Comprobación de root
+# Comprobación de root para la INSTALACIÓN
 if [ "$EUID" -ne 0 ]; then
-  echo "Por favor, ejecuta como root (sudo ./install-guadamint-xfce.sh)"
+  echo "Por favor, ejecuta el instalador como root (sudo ./install.sh)"
   exit 1
 fi
 
-echo ">>> Instalando sistema de actualizaciones GuadaMint..."
+echo ">>> Instalando sistema de actualizaciones GuadaMint en /usr/bin..."
 
 # 1. Definir rutas
-SOURCE_DIR=$(dirname "$0") # Directorio donde está este script
-DEST_BIN="/usr/bin/guadamint-updater.py"
+SOURCE_DIR=$(dirname "$0")
+DEST_BIN="/usr/bin/guadamint-updater.py"  # <--- CAMBIO AQUÍ
 DEST_SERVICE="/etc/systemd/system/guadamint-updater.service"
+LOG_DIR="/var/log/guadamint"
 
 # 2. Copiar el script Python
-echo "Copiando script Python a $DEST_BIN..."
+echo "Copiando script a $DEST_BIN..."
 cp "$SOURCE_DIR/guadamint-updater.py" "$DEST_BIN"
-chmod 755 "$DEST_BIN" # Permisos de ejecución
+
+# Permisos 755: rwxr-xr-x
+# (Owner=root puede escribir/ejecutar, Grupo/Otros pueden leer/ejecutar)
+chmod 755 "$DEST_BIN" 
 
 # 3. Copiar el servicio Systemd
 echo "Copiando servicio a $DEST_SERVICE..."
 cp "$SOURCE_DIR/guadamint-updater.service" "$DEST_SERVICE"
-chmod 644 "$DEST_SERVICE" # Permisos estándar para unidades systemd
+chmod 644 "$DEST_SERVICE"
 
-# 4. Crear directorio de logs (opcional, pero recomendado para evitar errores de permisos)
-mkdir -p /var/log/guadamint/
-chmod 755 /var/log/guadamint/
+# 4. Crear directorio de logs
+# Esto es importante para que el script no falle al intentar crear el log
+mkdir -p "$LOG_DIR"
+chmod 755 "$LOG_DIR"
 
 # 5. Activar el servicio
 echo "Habilitando servicio systemd..."
@@ -33,4 +38,4 @@ systemctl daemon-reload
 systemctl enable guadamint-updater.service
 
 echo ">>> Instalación completada."
-echo "El sistema buscará actualizaciones en cada reinicio."
+echo "El script reside en /usr/bin/guadamint-updater.py y se ejecutará como root al inicio."
