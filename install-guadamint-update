@@ -10,13 +10,13 @@ echo ">>> Instalando sistema de actualizaciones GuadaMint en /usr/bin..."
 
 # 1. Definir rutas
 SOURCE_DIR=$(dirname "$0")
-DEST_BIN="/usr/bin/guadamint-updater.py"  # <--- CAMBIO AQUÍ
-DEST_SERVICE="/etc/systemd/system/guadamint-updater.service"
+DEST_BIN="/usr/bin/guadamint-update.py"  # <--- CAMBIO AQUÍ
+DEST_SERVICE="/etc/systemd/system/guadamint-update.service"
 LOG_DIR="/var/log/guadamint"
 
 # 2. Copiar el script Python
 echo "Copiando script a $DEST_BIN..."
-cp "$SOURCE_DIR/guadamint-updater.py" "$DEST_BIN"
+cp "$SOURCE_DIR/guadamint-update.py" "$DEST_BIN"
 
 # Permisos 755: rwxr-xr-x
 # (Owner=root puede escribir/ejecutar, Grupo/Otros pueden leer/ejecutar)
@@ -24,7 +24,7 @@ chmod 755 "$DEST_BIN"
 
 # 3. Copiar el servicio Systemd
 echo "Copiando servicio a $DEST_SERVICE..."
-cp "$SOURCE_DIR/guadamint-updater.service" "$DEST_SERVICE"
+cp "$SOURCE_DIR/guadamint-update.service" "$DEST_SERVICE"
 chmod 644 "$DEST_SERVICE"
 
 # 4. Crear directorio de logs
@@ -35,7 +35,7 @@ chmod 755 "$LOG_DIR"
 # 5. Activar el servicio
 echo "Habilitando servicio systemd..."
 systemctl daemon-reload
-systemctl enable guadamint-updater.service
+systemctl enable guadamint-update.service
 
 echo ">>> Instalación completada."
-echo "El script reside en /usr/bin/guadamint-updater.py y se ejecutará como root al inicio."
+echo "El script reside en /usr/bin/guadamint-update.py y se ejecutará como root al inicio."
