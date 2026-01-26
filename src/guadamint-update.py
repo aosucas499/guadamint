@@ -3,15 +3,12 @@ import subprocess
 import logging
 import os
 import sys
-import time
-import random
+import shutil
 
 # ==============================================================================
 # CONFIGURACIÓN
 # ==============================================================================
-
-LOG_FILE = "/var/log/guadamint/actualizador.log"
-LOCK_FILE = "/tmp/guadamint-updating.lock"
+LOG_FILE = "/var/log/guadamint/detector.log"
 
 # Configuración de Logging
 logging.basicConfig(
@@ -24,63 +21,92 @@ logging.basicConfig(
 # FUNCIONES
 # ==============================================================================
 
-def enviar_notificacion(titulo, mensaje):
-    """
-    Intenta enviar una notificación visual al usuario.
-    Nota: Desde systemd esto es complejo porque no hay 'pantalla' asociada al servicio.
-    Intentamos forzar la pantalla :0.
-    """
+def log_y_print(mensaje):
+    """Muestra el mensaje en la terminal y lo guarda en el log."""
+    print(mensaje, flush=True)
+    logging.info(mensaje)
+
+def obtener_usuario_grafico():
+    """Detecta qué usuario está usando la pantalla."""
+    # 1. Si lo ejecutas tú con sudo
+    user = os.environ.get('SUDO_USER')
+    if user: return user
+
+    # 2. Si lo ejecuta el sistema, buscamos el usuario 1000
     try:
-        # Definimos el entorno para que sepa dónde mostrar la ventana
-        env = os.environ.copy()
-        env['DISPLAY'] = ':0'
-        env['DBUS_SESSION_BUS_ADDRESS'] = 'unix:path=/run/user/1000/bus' # Asume usuario ID 1000 (el primer usuario creado)
+        return subprocess.check_output(["id", "-un", "1000"], text=True).strip()
+    except:
+        return None
+
+def mostrar_ventana_grafica(titulo, mensaje):
+    """Muestra la ventana Zenity saltándose la seguridad de Root."""
+    
+    # 0. Verificación de Zenity
+    if not shutil.which("zenity"):
+        log_y_print(">>> ERROR: 'zenity' no está instalado.")
+        return
+
+    usuario = obtener_usuario_grafico()
+    
+    if not usuario:
+        log_y_print(">>> AVISO: No se detectó usuario gráfico.")
+        return
+
+    # Localizamos la llave de seguridad (.Xauthority)
+    xauth = f"/home/{usuario}/.Xauthority"
+    
+    if not os.path.exists(xauth):
+        log_y_print(f">>> AVISO: El usuario {usuario} no tiene archivo .Xauthority (¿Sin sesión gráfica?).")
+        return
+
+    # Construimos el comando ROBUSTO
+    # Usamos 'env' dentro de sudo para inyectar las variables directamente al proceso final
+    cmd = [
+        'sudo', '-u', usuario,
+        'env', 
+        'DISPLAY=:0', 
+        f'XAUTHORITY={xauth}',
+        'zenity', '--info', 
+        '--title', titulo,
+        '--text', f"<span size='large'><b>{mensaje}</b></span>",
+        '--width', '400',
+        '--timeout', '10'
+    ]
+    
+    log_y_print(f">>> Intentando mostrar ventana a usuario: {usuario}")
+    
+    try:
+        # Capturamos stdout y stderr para ver qué pasa
+        resultado = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
         
-        # Ejecutamos notify-send
-        subprocess.run(
-            ['notify-send', '-u', 'normal', '-t', '5000', titulo, mensaje],
-            env=env,
-            stderr=subprocess.DEVNULL
-        )
-        # También lo mandamos a la terminal por si se ejecuta manual
-        print(f"AVISO: {titulo} - {mensaje}")
-        
+        if resultado.returncode == 0:
+            log_y_print(">>> ÉXITO: Ventana mostrada correctamente.")
+        else:
+            log_y_print(f">>> ERROR AL MOSTRAR VENTANA (Código {resultado.returncode}):")
+            log_y_print(f"    DETALLE TÉCNICO: {resultado.stderr}")
+
     except Exception as e:
-        logging.error(f"No se pudo enviar notificación visual: {e}")
+        log_y_print(f">>> EXCEPCIÓN CRÍTICA: {e}")
 
 def detectar_escritorio():
-    """Comprueba si es Cinnamon o XFCE y avisa."""
-    logging.info("--- Detectando Entorno de Escritorio ---")
+    """Detecta el escritorio y muestra el aviso."""
+    log_y_print("--- Analizando entorno de escritorio ---")
     
     es_cinnamon = os.path.exists("/usr/bin/cinnamon-session")
     es_xfce = os.path.exists("/usr/bin/xfce4-session")
     
-    if es_cinnamon:
-        msj = "Se ha detectado el escritorio CINNAMON."
-        logging.info("DETECTADO: Cinnamon")
-        enviar_notificacion("GuadaMint Info", msj)
-        
-    elif es_xfce:
-        msj = "Se ha detectado el escritorio XFCE."
-        logging.info("DETECTADO: XFCE")
-        enviar_notificacion("GuadaMint Info", msj)
-        
-    else:
-        msj = "No se ha identificado un escritorio estándar (ni XFCE ni Cinnamon)."
-        logging.warning("DETECTADO: Desconocido")
-        enviar_notificacion("GuadaMint Info", msj)
+    nombre_escritorio = "Desconocido"
 
-def ejecutar_comando(comando):
-    """Ejecuta comando apt de forma silenciosa y segura."""
-    try:
-        env = os.environ.copy()
-        env['DEBIAN_FRONTEND'] = 'noninteractive'
-        subprocess.run(comando, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, env=env, check=True)
-        logging.info(f"OK: {' '.join(comando)}")
-        return True
-    except subprocess.CalledProcessError as e:
-        logging.error(f"FALLO: {' '.join(comando)} -> {e.stderr}")
-        return False
+    if es_cinnamon:
+        nombre_escritorio = "CINNAMON"
+    elif es_xfce:
+        nombre_escritorio = "XFCE"
+    
+    log_y_print(f">>> VARIABLE DETECTADA: {nombre_escritorio}")
+    
+    # Mensaje para la ventana
+    msj = f"Bienvenido a GuadaMint.\nSe ha detectado el escritorio: {nombre_escritorio}"
+    mostrar_ventana_grafica("Información del Sistema", msj)
 
 # ==============================================================================
 # MAIN
@@ -88,43 +114,15 @@ def ejecutar_comando(comando):
 
 def main():
     if os.geteuid() != 0:
-        print("Este script debe ejecutarse como ROOT.")
-        # Si lo ejecutas como usuario normal para probar, intentará notificar igual
-        detectar_escritorio()
+        print("!!! ERROR: Debes ejecutar este script como ROOT (sudo).")
         sys.exit(1)
 
-    logging.info("=== INICIO SERVICIO ===")
+    log_y_print("\n=== INICIO DE DETECCIÓN ===")
     
-    # 1. Detectar y Avisar
+    # Detectar y Avisar
     detectar_escritorio()
 
-    # 2. Espera de seguridad (para no saturar red al arrancar)
-    wait = random.randint(10, 60)
-    logging.info(f"Esperando {wait} segundos...")
-    time.sleep(wait)
-
-    # Crear lock
-    with open(LOCK_FILE, 'w') as f: f.write("updating")
-
-    # 3. Actualizar
-    try:
-        logging.info("Actualizando repositorios...")
-        if ejecutar_comando(['apt-get', 'update']):
-            logging.info("Instalando actualizaciones...")
-            cmd = [
-                'apt-get', 'dist-upgrade', '-y',
-                '-o', 'Dpkg::Options::=--force-confdef',
-                '-o', 'Dpkg::Options::=--force-confold'
-            ]
-            if ejecutar_comando(cmd):
-                ejecutar_comando(['apt-get', 'autoremove', '-y'])
-                ejecutar_comando(['apt-get', 'autoclean'])
-    except Exception as e:
-        logging.critical(f"Error fatal: {e}")
-    finally:
-        if os.path.exists(LOCK_FILE):
-            os.remove(LOCK_FILE)
-        logging.info("=== FIN ===")
+    log_y_print("=== FIN DEL PROCESO ===")
 
 if __name__ == "__main__":
     main()
