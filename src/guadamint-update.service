@@ -1,0 +1,15 @@
+[Unit]
+Description=Actualizador Automatico GuadaMint
+After=network-online.target local-fs.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=root
+# EJECUCIÓN: El sistema (root) ejecuta el script, sin importar el usuario logueado.
+ExecStart=/usr/bin/python3 /usr/bin/guadamint-update.py
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
