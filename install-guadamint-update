@@ -11,7 +11,7 @@ echo ">>> Instalando sistema de actualizaciones GuadaMint en /usr/bin..."
 # 1. Definir rutas
 SOURCE_DIR=$(dirname "$0")
 DEST_BIN="/usr/bin/guadamint-update.py"  
-DEST_DESKTOP="/etc/xdg/autostart/switch-autoupdate-dre-appindicator.desktop"
+DEST_DESKTOP="/etc/xdg/autostart/guadamint-update.desktop"
 LOG_DIR="/var/log/guadamint"
 
 # 2. Copiar el script Python
