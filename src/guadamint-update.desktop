@@ -1,12 +1,15 @@
 [Desktop Entry]
 Type=Application
-Exec=/usr/bin/guadamint-update.py
+Name=GuadaMint Updater
+Name[es_ES]=Apps-guadalinex-20
+Comment=Actualizador automático escolar
+Comment[es_ES]=Actualizador de guadamint
+Exec=sudo /usr/bin/guadamint-update.py
 Icon=/usr/share/icons/AndaTuz2.svg
 Terminal=true
-Name[es_ES]=Apps-guadalinex-20
-Comment[es_ES]=Actualizador de guadamint
 Categories=System;Settings;
 X-GNOME-Autostart-enabled=true
-X-GNOME-Autostart-Delay=1
+# Esperamos 5 segundos para asegurar que el escritorio cargó bien
+X-GNOME-Autostart-Delay=5
 NoDisplay=false
 Hidden=false
