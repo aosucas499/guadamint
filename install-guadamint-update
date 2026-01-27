@@ -5,72 +5,47 @@ if [ "$EUID" -ne 0 ]; then
   echo "Por favor, ejecuta el instalador como root (sudo ./install.sh)"
   exit 1
 fi
-echo ">>> Instalando sistema de actualizaciones GuadaMint en /usr/bin..."
 
-# Definir rutas
+echo ">>> Instalando sistema de actualizaciones GuadaMint..."
+
+# 1. DEFINIR RUTAS (ESTO SIEMPRE DEBE IR PRIMERO)
+# Si no definimos esto aquí, los comandos de abajo fallarán.
 SOURCE_DIR=$(dirname "$0")
 DEST_BIN="/usr/bin/guadamint-update.py"  
 DEST_DESKTOP="/etc/xdg/autostart/guadamint-update.desktop"
 LOG_DIR="/var/log/guadamint"
 
-#!/bin/bash
+# 2. CONFIGURAR SUDOERS (Permisos para actualizar sin contraseña)
+# Usamos el archivo que tienes en src/
+SUDOERS_SRC="$SOURCE_DIR/src/zz-guadamint-update"
+SUDOERS_DEST="/etc/sudoers.d/zz-guadamint-update"
 
-# Comprobación de root para la INSTALACIÓN
-if [ "$EUID" -ne 0 ]; then
-  echo "Por favor, ejecuta el instalador como root (sudo ./install.sh)"
-  exit 1
+if [ -f "$SUDOERS_SRC" ]; then
+    echo "Configurando permisos sudo..."
+    cp "$SUDOERS_SRC" "$SUDOERS_DEST"
+    chown root:root "$SUDOERS_DEST"
+    chmod 0440 "$SUDOERS_DEST"
+else
+    echo "¡ADVERTENCIA! No se encontró $SUDOERS_SRC"
+    echo "El actualizador fallará al pedir contraseña."
 fi
 
-# Hacer guadamint-update ejecutable por todos los usuario con permisos root
-sudo chown root:root "$SOURCE_DIR/src/zz-guadamint-update" 
-sudo chmod 0440 "$SOURCE_DIR/src/zz-guadamint-update"
-sudo cp "$SOURCE_DIR/src/zz-guadamint-update" /etc/sudoers.d/
-
-echo ">>> Instalando sistema de actualizaciones GuadaMint en /usr/bin..."
-
-# Definir rutas
-SOURCE_DIR=$(dirname "$0")
-DEST_BIN="/usr/bin/guadamint-update.py"  
-DEST_DESKTOP="/etc/xdg/autostart/guadamint-update.desktop"
-LOG_DIR="/var/log/guadamint"
-
-# Copiar el script Python
+# 3. COPIAR EL SCRIPT PYTHON
 echo "Copiando script a $DEST_BIN..."
 cp "$SOURCE_DIR/src/guadamint-update.py" "$DEST_BIN"
-
-# Permisos 755: rwxr-xr-x
-# (Owner=root puede escribir/ejecutar, Grupo/Otros pueden leer/ejecutar)
+# Permisos 755 para que cualquiera pueda ejecutarlo
 chmod 755 "$DEST_BIN" 
 
-# Copiar el autoarranque para todos los usuarios
-echo "Copiando servicio a $DEST_DESKTOP..."
+# 4. COPIAR EL AUTOARRANQUE (.desktop)
+echo "Copiando lanzador a $DEST_DESKTOP..."
 cp "$SOURCE_DIR/src/guadamint-update.desktop" "$DEST_DESKTOP"
+chmod 644 "$DEST_DESKTOP"
 
-# Crear directorio de logs
-# Esto es importante para que el script no falle al intentar crear el log
+# 5. CREAR DIRECTORIO DE LOGS
+# Usamos 777 porque el script lo ejecuta el ALUMNO, no root.
+# Si pones 755, el alumno no tendrá permiso para escribir el log.
 mkdir -p "$LOG_DIR"
 chmod 777 "$LOG_DIR"
 
 echo ">>> Instalación completada."
-echo "El script reside en /usr/bin/guadamint-update.py y se ejecutará como root al inicio."
-
-
-# Copiar el script Python
-echo "Copiando script a $DEST_BIN..."
-cp "$SOURCE_DIR/src/guadamint-update.py" "$DEST_BIN"
-
-# Permisos 755: rwxr-xr-x
-# (Owner=root puede escribir/ejecutar, Grupo/Otros pueden leer/ejecutar)
-chmod 755 "$DEST_BIN" 
-
-# 3. Copiar el autoarranque para todos los usuarios
-echo "Copiando servicio a $DEST_DESKTOP..."
-cp "$SOURCE_DIR/src/guadamint-update.desktop" "$DEST_DESKTOP"
-
-# 4. Crear directorio de logs
-# Esto es importante para que el script no falle al intentar crear el log
-mkdir -p "$LOG_DIR"
-chmod 755 "$LOG_DIR"
-
-echo ">>> Instalación completada."
-echo "El script reside en /usr/bin/guadamint-update.py y se ejecutará como root al inicio."
+echo "El script reside en /usr/bin/guadamint-update.py y se ejecutará al iniciar sesión."
