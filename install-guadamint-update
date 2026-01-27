@@ -41,7 +41,16 @@ echo "Copiando lanzador a $DEST_DESKTOP..."
 cp "$SOURCE_DIR/src/guadamint-update.desktop" "$DEST_DESKTOP"
 chmod 644 "$DEST_DESKTOP"
 
-# 5. CREAR DIRECTORIO DE LOGS
+# 5. INSTALAR ICONO
+echo "Instalando icono en $DEST_ICON..."
+if [ -f "$SOURCE_DIR/images/guadamintuz.svg" ]; then
+    cp "$SOURCE_DIR/images/guadamintuz.svg" "$DEST_ICON"
+    chmod 644 "$DEST_ICON"
+else
+    echo "AVISO: No se encontró el icono en $SOURCE_DIR/images/guadamintuz.svg"
+fi
+
+# 6. CREAR DIRECTORIO DE LOGS
 # Usamos 777 porque el script lo ejecuta el ALUMNO, no root.
 # Si pones 755, el alumno no tendrá permiso para escribir el log.
 mkdir -p "$LOG_DIR"
