@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Exec=/usr/bin/guadamint-update.py
+Icon=/usr/share/icons/AndaTuz2.svg
+Terminal=true
+Name[es_ES]=Apps-guadalinex-20
+Comment[es_ES]=Actualizador de guadamint
+Categories=System;Settings;
+X-GNOME-Autostart-enabled=true
+X-GNOME-Autostart-Delay=1
+NoDisplay=false
+Hidden=false
