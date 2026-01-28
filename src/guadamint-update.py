@@ -12,6 +12,30 @@ import random
 LOG_FILE = "/var/log/guadamint/actualizador.log"
 LOCK_FILE = "/tmp/guadamint-updating.lock"
 
+# LISTA DE APPS QUE DEBEN ESTAR INSTALADAS SÍ O SÍ
+APPS_OBLIGATORIAS = [
+    # Utilidades sistema
+    "zram-tools", 
+    
+    # Suite Tux (Infantil/Primaria)
+    "tuxtype", "tuxmath", "tuxpaint", 
+    
+    # Suite KDE-Edu (Lengua/Geografía)
+    "kgeography", "kwordquiz", "klettres", "khangman", "kanagram", 
+    
+    # Ciencia y Lógica
+    "stellarium", "kalzium", "step", "gbrainy", "marble",
+    
+    # Programación
+    "scratch", "kturtle", "thonny", "minetest",
+    
+    # Multimedia y Creatividad
+    "gcompris-qt", "childsplay", "audacity", "pinta",
+    
+    # Mecanografía formal
+    "klavaro"
+]
+
 # Configuración de Logging
 logging.basicConfig(
     filename=LOG_FILE, 
@@ -29,59 +53,37 @@ def log_y_print(mensaje):
     logging.info(mensaje)
 
 def obtener_usuario_real():
-    """
-    Detecta quién es el usuario que inició la sesión gráfica.
-    Es vital porque el script corre como ROOT (sudo) y necesitamos saber
-    quién es el humano para mostrarle la ventana en su pantalla.
-    """
+    """Detecta quién es el usuario que inició la sesión gráfica."""
     return os.environ.get('SUDO_USER')
 
 def mostrar_aviso(titulo, mensaje, icono="info"):
-    """
-    Muestra una ventana Zenity en la pantalla del usuario.
-    Truco: Se ejecuta como el usuario alumno (sudo -u) para que sea visible.
-    """
+    """Muestra una ventana Zenity en la pantalla del usuario."""
     usuario = obtener_usuario_real()
-    
-    # Si no detectamos usuario (ej. corriendo en cron), no hacemos nada
-    if not usuario:
-        return
+    if not usuario: return
 
-    # Comando para ejecutar zenity COMO el usuario alumno
     cmd = [
-        'sudo', '-u', usuario,     # Cambiamos identidad al usuario
+        'sudo', '-u', usuario,
         'zenity', '--info',
         '--title', titulo,
         '--text', mensaje,
         '--width', '400',
-        '--timeout', '10'          # Se cierra sola a los 10s
+        '--timeout', '10'
     ]
-    
-    # Añadimos el icono si se especifica
-    if icono:
-        cmd.append(f'--window-icon={icono}')
+    if icono: cmd.append(f'--window-icon={icono}')
 
-    # Preparamos el entorno gráfico apuntando a la pantalla principal :0
     env = os.environ.copy()
     env['DISPLAY'] = ':0'
     
     try:
-        # Ejecutamos sin bloquear el script (stderr a DEVNULL para no ensuciar)
         subprocess.Popen(cmd, env=env, stderr=subprocess.DEVNULL)
     except Exception as e:
         log_y_print(f"Error al mostrar ventana: {e}")
 
 def detectar_escritorio():
-    """
-    Comprueba qué entorno está instalado.
-    Retorna: 'CINNAMON', 'XFCE' o 'DESCONOCIDO'
-    """
-    if os.path.exists("/usr/bin/cinnamon-session"):
-        return "CINNAMON"
-    elif os.path.exists("/usr/bin/xfce4-session"):
-        return "XFCE"
-    else:
-        return "DESCONOCIDO"
+    """Retorna: 'CINNAMON', 'XFCE' o 'DESCONOCIDO'."""
+    if os.path.exists("/usr/bin/cinnamon-session"): return "CINNAMON"
+    elif os.path.exists("/usr/bin/xfce4-session"): return "XFCE"
+    else: return "DESCONOCIDO"
 
 def ejecutar_comando(comando):
     """Ejecuta comandos apt de forma silenciosa."""
@@ -96,52 +98,80 @@ def ejecutar_comando(comando):
         logging.error(f"STDERR: {e.stderr}")
         return False
 
+# --- FUNCIÓN PARA APPS ---
+def verificar_e_instalar_apps():
+    """Comprueba la lista de apps obligatorias e instala las que falten."""
+    faltantes = []
+    
+    log_y_print("--- Verificando aplicaciones obligatorias ---")
+    
+    for app in APPS_OBLIGATORIAS:
+        # dpkg -s devuelve 0 si está instalado, 1 si no
+        resultado = subprocess.run(
+            ["dpkg", "-s", app], 
+            stdout=subprocess.DEVNULL, 
+            stderr=subprocess.DEVNULL
+        )
+        
+        if resultado.returncode != 0:
+            log_y_print(f">>> Falta la aplicación: {app}")
+            faltantes.append(app)
+    
+    if len(faltantes) > 0:
+        log_y_print(f">>> Instalando {len(faltantes)} aplicaciones faltantes...")
+        
+        mostrar_aviso("Mantenimiento GuadaMint", f"Instalando {len(faltantes)} aplicaciones educativas nuevas...")
+        
+        ejecutar_comando(['apt-get', 'update'])
+        comando_install = ['apt-get', 'install', '-y'] + faltantes
+        
+        if ejecutar_comando(comando_install):
+            log_y_print(">>> Aplicaciones instaladas correctamente.")
+            mostrar_aviso("GuadaMint", "Software educativo actualizado correctamente.")
+        else:
+            log_y_print("!!! Error al instalar aplicaciones.")
+            mostrar_aviso("Error", "Fallo al instalar algunas aplicaciones.", icono="error")
+    else:
+        log_y_print(">>> Todas las aplicaciones obligatorias están instaladas.")
+
 # ==============================================================================
 # MAIN
 # ==============================================================================
 
 def main():
-    # Comprobación de seguridad: El script DEBE ser root para funcionar
-    # (El .desktop se encarga de llamar a sudo)
     if os.geteuid() != 0:
         print("!!! ERROR: Debes ejecutar este script como ROOT (sudo).")
         sys.exit(1)
 
     log_y_print("=== INICIO SERVICIO GUADAMINT ===")
     
-    # 1. DETECCIÓN DE ESCRITORIO
+    # 1. DETECCIÓN
     tipo_escritorio = detectar_escritorio()
     log_y_print(f">>> Entorno detectado: {tipo_escritorio}")
 
-    # --- PRUEBA ZENITY ---
-    # Esto confirma que el sistema gráfico funciona
-    mostrar_aviso("GuadaMint Info", f"Entorno de escritorio detectado: <b>{tipo_escritorio}</b>")
-    # ---------------------
+    # 2. COMPROBACIÓN DE APPS
+    verificar_e_instalar_apps()
 
-    # --- ZONA DE LÓGICA FUTURA ---
+    # 3. ZONA DE LÓGICA FUTURA
     if tipo_escritorio == "XFCE":
         pass 
     elif tipo_escritorio == "CINNAMON":
         pass 
-    # -----------------------------
 
-    # 2. ESPERA DE SEGURIDAD (10-60 segundos)
-    # Evita saturar la red si todos los PCs arrancan a la vez
+    # 4. ESPERA DE SEGURIDAD
     wait_time = random.randint(5, 10)
-    log_y_print(f">>> Esperando {wait_time} segundos antes de actualizar...")
+    log_y_print(f">>> Esperando {wait_time} segundos antes de terminar...")
     time.sleep(wait_time)
 
-    # 3. GESTIÓN DE LOCK FILE
+    # 5. GESTIÓN DE LOCK FILE
     try:
         with open(LOCK_FILE, 'w') as f:
-            f.write("updating")
+            f.write("running")
     except: pass
 
-# --- LIMPIEZA FINAL (AÑADIDO) ---
-    # Es buena práctica borrar el archivo lock al terminar
+    # LIMPIEZA FINAL
     if os.path.exists(LOCK_FILE):
-        try:
-            os.remove(LOCK_FILE)
+        try: os.remove(LOCK_FILE)
         except: pass
     
     log_y_print("=== FIN DEL SERVICIO ===")
