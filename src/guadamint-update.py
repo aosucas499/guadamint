@@ -137,5 +137,14 @@ def main():
             f.write("updating")
     except: pass
 
+# --- LIMPIEZA FINAL (AÑADIDO) ---
+    # Es buena práctica borrar el archivo lock al terminar
+    if os.path.exists(LOCK_FILE):
+        try:
+            os.remove(LOCK_FILE)
+        except: pass
+    
+    log_y_print("=== FIN DEL SERVICIO ===")
+
 if __name__ == "__main__":
     main()
