@@ -15,7 +15,7 @@ LOCK_FILE = "/tmp/guadamint-updating.lock"
 # LISTA DE APPS QUE DEBEN ESTAR INSTALADAS SÍ O SÍ
 APPS_OBLIGATORIAS = [
     # Utilidades sistema
-    "zram-tools", 
+    "zram-tools", "git",
     
     # Suite Tux (Infantil/Primaria)
     "tuxtype", "tuxmath", "tuxpaint", 
