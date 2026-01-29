@@ -33,7 +33,7 @@ APPS_OBLIGATORIAS = [
     "scratch", "kturtle", "thonny", "minetest",
     
     # Multimedia y Creatividad
-    "gcompris-qt", "audacity",
+    "gcompris-qt", "childsplay", "audacity", "pinta",
     
     # Mecanografía formal
     "klavaro"
@@ -62,6 +62,39 @@ def obtener_usuario_real():
     """Detecta quién es el usuario que inició la sesión gráfica."""
     return os.environ.get('SUDO_USER')
 
+def obtener_entorno_usuario(usuario):
+    """
+    Recupera las variables de entorno críticas (DISPLAY y DBUS) del usuario.
+    Esto es necesario para que el icono se ancle en la barra de tareas.
+    """
+    env_vars = {'DISPLAY': ':0'} # Valor por defecto
+
+    try:
+        # Buscamos el PID del gestor de sesión del usuario
+        # Buscamos procesos clave: cinnamon-session, xfce4-session
+        pids = subprocess.check_output(["pgrep", "-u", usuario, "-f", "session"], text=True).split()
+        
+        for pid in pids:
+            try:
+                with open(f"/proc/{pid}/environ", "rb") as f:
+                    contenido = f.read().decode("utf-8", errors="ignore")
+                    
+                # Extraemos las variables que nos interesan
+                for item in contenido.split('\0'):
+                    if item.startswith("DBUS_SESSION_BUS_ADDRESS="):
+                        env_vars['DBUS_SESSION_BUS_ADDRESS'] = item.split("=", 1)[1]
+                    elif item.startswith("DISPLAY="):
+                        env_vars['DISPLAY'] = item.split("=", 1)[1]
+                
+                # Si encontramos el DBUS, nos damos por satisfechos
+                if 'DBUS_SESSION_BUS_ADDRESS' in env_vars:
+                    break
+            except: continue
+    except Exception as e:
+        log_y_print(f"Aviso: No se pudo obtener entorno completo ({e})")
+    
+    return env_vars
+
 # ==============================================================================
 # GESTIÓN DEL ICONO DE BANDEJA (SYSTEM TRAY)
 # ==============================================================================
@@ -72,67 +105,64 @@ def iniciar_tray_icon():
     usuario = obtener_usuario_real()
     if not usuario: return
 
-    # Icono inicial: Usamos el personalizado si existe, si no uno de sistema
+    # Obtenemos el entorno real para poder conectar con la barra de tareas
+    entorno_grafico = os.environ.copy()
+    datos_sesion = obtener_entorno_usuario(usuario)
+    entorno_grafico.update(datos_sesion)
+
+    # Icono inicial
     icono_inicial = ICONO_DEFECTO if os.path.exists(ICONO_DEFECTO) else "system-software-update"
 
     cmd = [
         'sudo', '-u', usuario,
         'zenity', '--notification',
-        '--listen', # Modo escucha: permite cambiar el icono dinámicamente
-        f'--window-icon={icono_inicial}',
-        '--text=GuadaMint: Iniciando...'
+        '--listen', # Modo escucha
+        f'--window-icon={icono_inicial}'
+        # NOTA: Quitamos --text inicial para que no salga burbuja, solo icono
     ]
 
-    env = os.environ.copy()
-    env['DISPLAY'] = ':0'
-
     try:
-        # Iniciamos el proceso y guardamos la referencia para enviarle comandos
         TRAY_PROCESS = subprocess.Popen(
             cmd, 
-            env=env, 
+            env=entorno_grafico, 
             stdin=subprocess.PIPE, 
             stdout=subprocess.DEVNULL, 
             stderr=subprocess.DEVNULL,
             text=True
         )
+        # Enviamos tooltip inicial silencioso
+        actualizar_tray('inicio', "GuadaMint Iniciando...")
         log_y_print(">>> Icono de bandeja iniciado.")
     except Exception as e:
         log_y_print(f"Error al iniciar icono tray: {e}")
 
 def actualizar_tray(estado, mensaje=""):
     """
-    Cambia el icono y el texto de la bandeja según el estado.
-    Estados: 'trabajando', 'ok', 'error', 'info'
+    Cambia el icono y el texto de la bandeja.
     """
     global TRAY_PROCESS
     if not TRAY_PROCESS or TRAY_PROCESS.poll() is not None:
-        return # El icono no está corriendo
+        return
 
-    # Definimos iconos estándar del tema (funcionan en Mint/XFCE)
     iconos = {
         'inicio': 'preferences-system',
-        'trabajando': 'system-software-install', # O 'process-working'
-        'ok': 'security-high',                  # O 'emblem-default'
+        'trabajando': 'system-software-install',
+        'ok': 'security-high',
         'error': 'dialog-error'
     }
     
     icono_nombre = iconos.get(estado, 'info')
-    
-    # Si tenemos el SVG personalizado y es el estado inicio, intentamos usarlo
     if estado == 'inicio' and os.path.exists(ICONO_DEFECTO):
         icono_nombre = ICONO_DEFECTO
 
     try:
-        # Enviamos comandos a Zenity a través de su entrada estándar (stdin)
         if mensaje:
             TRAY_PROCESS.stdin.write(f"tooltip: GuadaMint - {mensaje}\n")
         
-        # Cambiamos el icono
         TRAY_PROCESS.stdin.write(f"icon: {icono_nombre}\n")
         TRAY_PROCESS.stdin.flush()
-    except Exception as e:
-        log_y_print(f"No se pudo actualizar el icono: {e}")
+    except Exception:
+        pass
 
 def cerrar_tray_icon():
     """Cierra el icono de la bandeja."""
@@ -148,9 +178,12 @@ def cerrar_tray_icon():
 # ==============================================================================
 
 def mostrar_aviso(titulo, mensaje, icono="info"):
-    """Muestra una ventana Zenity (popup) en la pantalla del usuario."""
+    """Muestra una ventana Zenity (popup)."""
     usuario = obtener_usuario_real()
     if not usuario: return
+
+    entorno_grafico = os.environ.copy()
+    entorno_grafico.update(obtener_entorno_usuario(usuario))
 
     cmd = [
         'sudo', '-u', usuario,
@@ -162,22 +195,17 @@ def mostrar_aviso(titulo, mensaje, icono="info"):
     ]
     if icono: cmd.append(f'--window-icon={icono}')
 
-    env = os.environ.copy()
-    env['DISPLAY'] = ':0'
-    
     try:
-        subprocess.Popen(cmd, env=env, stderr=subprocess.DEVNULL)
+        subprocess.Popen(cmd, env=entorno_grafico, stderr=subprocess.DEVNULL)
     except Exception as e:
         log_y_print(f"Error al mostrar ventana: {e}")
 
 def detectar_escritorio():
-    """Retorna: 'CINNAMON', 'XFCE' o 'DESCONOCIDO'."""
     if os.path.exists("/usr/bin/cinnamon-session"): return "CINNAMON"
     elif os.path.exists("/usr/bin/xfce4-session"): return "XFCE"
     else: return "DESCONOCIDO"
 
 def ejecutar_comando(comando, visible=False):
-    """Ejecuta comandos apt."""
     try:
         env = os.environ.copy()
         env['DEBIAN_FRONTEND'] = 'noninteractive'
@@ -209,7 +237,6 @@ def verificar_e_instalar_apps():
             stdout=subprocess.DEVNULL, 
             stderr=subprocess.DEVNULL
         )
-        
         if resultado.returncode != 0:
             log_y_print(f">>> Falta la aplicación: {app}")
             faltantes.append(app)
@@ -217,16 +244,10 @@ def verificar_e_instalar_apps():
     if len(faltantes) > 0:
         log_y_print(f">>> Instalando {len(faltantes)} aplicaciones faltantes...")
         
-        # Cambiamos icono a "Trabajando"
         actualizar_tray('trabajando', f"Instalando {len(faltantes)} apps...")
-        
-        # Aviso visual en ventana también
         mostrar_aviso("Mantenimiento GuadaMint", f"Instalando {len(faltantes)} aplicaciones educativas nuevas...")
         
-        # 1. Update
         ejecutar_comando(['apt-get', 'update'], visible=True)
-        
-        # 2. Install
         comando_install = ['apt-get', 'install', '-y'] + faltantes
         
         if ejecutar_comando(comando_install, visible=True):
@@ -238,7 +259,7 @@ def verificar_e_instalar_apps():
             actualizar_tray('error', "Error en instalación")
             mostrar_aviso("Error", "Fallo al instalar algunas aplicaciones.", icono="error")
     else:
-        log_y_print(">>> Todas las aplicaciones obligatorias están instaladas.")
+        log_y_print(">>> Todas las aplicaciones están instaladas.")
         actualizar_tray('ok', "Sistema al día")
 
 # ==============================================================================
@@ -252,7 +273,6 @@ def main():
 
     log_y_print("=== INICIO SERVICIO GUADAMINT ===")
     
-    # Iniciar icono en la barra (se quedará ahí hasta que termine el script)
     iniciar_tray_icon()
     
     try:
@@ -260,34 +280,28 @@ def main():
         tipo_escritorio = detectar_escritorio()
         log_y_print(f">>> Entorno detectado: {tipo_escritorio}")
 
-        # 2. COMPROBACIÓN DE APPS
+        # 2. APPS
         verificar_e_instalar_apps()
 
-        # 3. ZONA DE LÓGICA FUTURA
-        if tipo_escritorio == "XFCE":
-            pass 
-        elif tipo_escritorio == "CINNAMON":
-            pass 
+        # 3. FUTURO
+        if tipo_escritorio == "XFCE": pass 
+        elif tipo_escritorio == "CINNAMON": pass 
 
         # 4. ESPERA DE SEGURIDAD
         wait_time = random.randint(5, 10)
         log_y_print(f">>> Esperando {wait_time} segundos antes de terminar...")
-        actualizar_tray('ok', "Finalizando...")
         time.sleep(wait_time)
 
-        # 5. GESTIÓN DE LOCK FILE
+        # 5. LOCK FILE
         try:
-            with open(LOCK_FILE, 'w') as f:
-                f.write("running")
+            with open(LOCK_FILE, 'w') as f: f.write("running")
         except: pass
 
-        # LIMPIEZA FINAL
         if os.path.exists(LOCK_FILE):
             try: os.remove(LOCK_FILE)
             except: pass
             
     finally:
-        # Importante: Cerrar el icono al salir para que no se quede "zombie" en la barra
         cerrar_tray_icon()
     
     log_y_print("=== FIN DEL SERVICIO ===")
