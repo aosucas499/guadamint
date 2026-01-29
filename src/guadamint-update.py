@@ -18,7 +18,7 @@ ICONO_DEFECTO = "/usr/share/icons/guadamintuz.svg"
 # LISTA DE APPS QUE DEBEN ESTAR INSTALADAS SÍ O SÍ
 APPS_OBLIGATORIAS = [
     # Utilidades sistema
-    "zram-tools", 
+    "zram-tools", "gnome-network-display", 
     
     # Suite Tux (Infantil/Primaria)
     "tuxtype", "tuxmath", "tuxpaint", 
@@ -33,7 +33,7 @@ APPS_OBLIGATORIAS = [
     "scratch", "kturtle", "thonny", "minetest",
     
     # Multimedia y Creatividad
-    "gcompris-qt", "childsplay", "audacity", "pinta",
+    "gcompris-qt", "audacity", "openboard",
     
     # Mecanografía formal
     "klavaro"
