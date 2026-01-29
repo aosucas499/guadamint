@@ -18,7 +18,7 @@ ICONO_DEFECTO = "/usr/share/icons/guadamintuz.svg"
 # LISTA DE APPS OBLIGATORIAS (ACTUALIZADA)
 APPS_OBLIGATORIAS = [
     # Utilidades sistema
-    "zram-tools", "gnome-network-display", 
+    "zram-tools", "gnome-network-displays", 
     
     # Suite Tux (Infantil/Primaria)
     "tuxtype", "tuxmath", "tuxpaint", 
