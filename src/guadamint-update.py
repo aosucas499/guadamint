@@ -15,7 +15,7 @@ LOCK_FILE = "/tmp/guadamint-updating.lock"
 # LISTA DE APPS QUE DEBEN ESTAR INSTALADAS SÍ O SÍ
 APPS_OBLIGATORIAS = [
     # Utilidades sistema
-    "zram-tools", "git",
+    "zram-tools", 
     
     # Suite Tux (Infantil/Primaria)
     "tuxtype", "tuxmath", "tuxpaint", 
@@ -30,7 +30,7 @@ APPS_OBLIGATORIAS = [
     "scratch", "kturtle", "thonny", "minetest",
     
     # Multimedia y Creatividad
-    "gcompris-qt", "audacity", 
+    "gcompris-qt", "childsplay", "audacity", "pinta",
     
     # Mecanografía formal
     "klavaro"
@@ -85,17 +85,29 @@ def detectar_escritorio():
     elif os.path.exists("/usr/bin/xfce4-session"): return "XFCE"
     else: return "DESCONOCIDO"
 
-def ejecutar_comando(comando):
-    """Ejecuta comandos apt de forma silenciosa."""
+def ejecutar_comando(comando, visible=False):
+    """
+    Ejecuta comandos apt.
+    Si visible=True, muestra la salida en la terminal en tiempo real.
+    Si visible=False, se ejecuta en silencio (capturando la salida).
+    """
     try:
         env = os.environ.copy()
         env['DEBIAN_FRONTEND'] = 'noninteractive'
-        subprocess.run(comando, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, env=env, check=True)
+        
+        if visible:
+            # Sin PIPE: La salida va directa a la pantalla del usuario
+            subprocess.run(comando, text=True, env=env, check=True)
+        else:
+            # Con PIPE: Silencioso, capturamos para log
+            subprocess.run(comando, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, env=env, check=True)
+            
         log_y_print(f"OK: {' '.join(comando)}")
         return True
     except subprocess.CalledProcessError as e:
         log_y_print(f"ERROR: {' '.join(comando)}")
-        logging.error(f"STDERR: {e.stderr}")
+        if not visible: # Si era visible ya salió el error en pantalla
+            logging.error(f"STDERR: {e.stderr}")
         return False
 
 # --- FUNCIÓN PARA APPS ---
@@ -122,10 +134,13 @@ def verificar_e_instalar_apps():
         
         mostrar_aviso("Mantenimiento GuadaMint", f"Instalando {len(faltantes)} aplicaciones educativas nuevas...")
         
-        ejecutar_comando(['apt-get', 'update'])
+        # 1. Update (Visible para que veas si descarga los índices)
+        ejecutar_comando(['apt-get', 'update'], visible=True)
+        
+        # 2. Install (Visible para que veas la barra de progreso)
         comando_install = ['apt-get', 'install', '-y'] + faltantes
         
-        if ejecutar_comando(comando_install):
+        if ejecutar_comando(comando_install, visible=True):
             log_y_print(">>> Aplicaciones instaladas correctamente.")
             mostrar_aviso("GuadaMint", "Software educativo actualizado correctamente.")
         else:
