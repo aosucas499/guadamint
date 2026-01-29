@@ -33,7 +33,7 @@ APPS_OBLIGATORIAS = [
     "scratch", "kturtle", "thonny", "minetest",
     
     # Multimedia y Creatividad
-    "gcompris-qt", "childsplay", "audacity", "pinta",
+    "gcompris-qt", "audacity",
     
     # Mecanografía formal
     "klavaro"
