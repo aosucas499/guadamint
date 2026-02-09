@@ -14,11 +14,10 @@ import filecmp
 LOG_FILE = "/var/log/guadamint/actualizador.log"
 LOCK_FILE = "/tmp/guadamint-updating.lock"
 
-# NUESTRO ICONO (ORIGEN)
-ICONO_PROPIO = "/usr/share/icons/guadamintuz.svg"
+# ICONO PRINCIPAL (Usado tanto para la bandeja como para reemplazar el logo del menú)
+ICONO_DEFECTO = "/usr/share/icons/guadamintuz.svg"
 
 # LOS ICONOS DEL SISTEMA QUE VAMOS A SUSTITUIR (DESTINOS)
-# Estos son los nombres estándar que usa Mint. Al sobrescribirlos, cambiamos el logo en todo el sistema.
 ICONOS_A_REEMPLAZAR = [
     "/usr/share/icons/linuxmint-logo-ring.svg",  # El círculo verde clásico
     "/usr/share/icons/linuxmint-logo-leaf.svg",  # La hoja sola
@@ -66,36 +65,28 @@ def obtener_usuario_real():
 def personalizar_menu_inicio():
     """
     Sobrescribe los iconos del sistema con nuestro logo corporativo.
-    Así no hace falta configurar nada en el escritorio del usuario.
     """
     log_y_print("--- Aplicando imagen corporativa (Sobrescribiendo logos) ---")
     
-    if not os.path.exists(ICONO_PROPIO):
-        log_y_print(f"!!! Error: No encuentro nuestro icono en {ICONO_PROPIO}")
+    if not os.path.exists(ICONO_DEFECTO):
+        log_y_print(f"!!! Error: No encuentro nuestro icono en {ICONO_DEFECTO}")
         return
 
     cambios_hechos = False
 
     for destino in ICONOS_A_REEMPLAZAR:
-        # Solo reemplazamos si el archivo destino existe (para no llenar basura)
-        # O si es un enlace simbólico (lo rompemos y ponemos nuestro archivo)
         if os.path.exists(destino) or os.path.islink(destino):
             try:
-                # Comparamos si ya son iguales para no escribir a lo tonto
-                # filecmp.cmp devuelve True si son iguales
-                if os.path.exists(destino) and filecmp.cmp(ICONO_PROPIO, destino, shallow=False):
-                    continue # Ya está actualizado
+                # Comparamos si ya son iguales
+                if os.path.exists(destino) and filecmp.cmp(ICONO_DEFECTO, destino, shallow=False):
+                    continue 
 
                 log_y_print(f"   > Reemplazando: {os.path.basename(destino)}")
                 
-                # Si es un enlace simbólico, lo borramos primero
                 if os.path.islink(destino):
                     os.unlink(destino)
                 
-                # Copiamos nuestro icono machacando el destino
-                shutil.copy2(ICONO_PROPIO, destino)
-                
-                # Permisos de lectura para todos
+                shutil.copy2(ICONO_DEFECTO, destino)
                 os.chmod(destino, 0o644)
                 cambios_hechos = True
             except Exception as e:
@@ -103,7 +94,6 @@ def personalizar_menu_inicio():
 
     if cambios_hechos:
         log_y_print(">>> Logos del sistema actualizados. Refrescando caché de iconos...")
-        # Forzamos la actualización de la caché de iconos para que se vea inmediato
         try:
             subprocess.run(['gtk-update-icon-cache', '-f', '-t', '/usr/share/icons/hicolor'], 
                          stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
@@ -198,6 +188,7 @@ def iniciar_tray_icon():
     entorno = os.environ.copy()
     entorno.update(obtener_entorno_usuario(usuario))
     
+    # Usamos ICONO_DEFECTO que ahora está definido globalmente
     icono = ICONO_DEFECTO if os.path.exists(ICONO_DEFECTO) else "system-software-update"
     cmd = ['sudo', '-u', usuario, 'zenity', '--notification', '--listen', f'--window-icon={icono}']
     
