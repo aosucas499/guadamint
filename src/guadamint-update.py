@@ -17,35 +17,21 @@ ICONO_DEFECTO = "/usr/share/icons/guadamintuz.svg"
 # --- CONFIGURACIÓN GIT ---
 REPO_URL = "https://github.com/aosucas499/guadalinex.git"
 REPO_DIR = "/opt/guadamint"
-# Cambia a "testing" para pruebas, "main" para producción
 REPO_BRANCH = "main" 
 
-# Rutas de archivos (Origen en Repo -> Destino en Sistema)
+# Rutas de archivos
 SCRIPT_SRC_PATH = os.path.join(REPO_DIR, "src/guadamint-update.py")
 SCRIPT_BIN_PATH = "/usr/bin/guadamint-update.py"
 
 # LISTA DE APPS OBLIGATORIAS
+# Corregido: 'gnome-network-displays' (en plural)
 APPS_OBLIGATORIAS = [
-    # Utilidades sistema
-    "zram-tools", "gnome-network-display", 
-    
-    # Suite Tux (Infantil/Primaria)
+    "zram-tools", "gnome-network-displays", 
     "tuxtype", "tuxmath", "tuxpaint", 
-    
-    # Suite KDE-Edu (Lengua/Geografía)
     "kgeography", "kwordquiz", "klettres", "khangman", "kanagram", 
-    
-    # Ciencia y Lógica
     "stellarium", "kalzium", "step", "gbrainy", "marble",
-    
-    # Programación
     "scratch", "kturtle", "thonny", "minetest",
-    
-    # Multimedia y Creatividad
-    "gcompris-qt", "audacity", "openboard",
-    
-    # Mecanografía formal
-    "klavaro"
+    "gcompris-qt", "audacity", "openboard", "klavaro"
 ]
 
 logging.basicConfig(filename=LOG_FILE, level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -56,12 +42,10 @@ TRAY_PROCESS = None
 # ==============================================================================
 
 def log_y_print(mensaje):
-    """Escribe en log y terminal."""
     print(mensaje, flush=True)
     logging.info(mensaje)
 
 def obtener_usuario_real():
-    """Detecta quién es el usuario que inició la sesión gráfica."""
     return os.environ.get('SUDO_USER')
 
 # ==============================================================================
@@ -69,74 +53,63 @@ def obtener_usuario_real():
 # ==============================================================================
 
 def auto_actualizar_desde_git():
-    """
-    Gestiona el clonado/actualización del repo y el reinicio del script si cambia.
-    """
     log_y_print(f"--- Comprobando actualizaciones del repositorio (Rama: {REPO_BRANCH}) ---")
     se_requiere_reinicio = False
 
-    # 1. Si no existe el directorio, clonamos de cero
+    # 1. Clonar si no existe
     if not os.path.exists(REPO_DIR):
         log_y_print(f">>> Clonando repositorio en {REPO_DIR}...")
         try:
             subprocess.run(["git", "clone", "-b", REPO_BRANCH, REPO_URL, REPO_DIR], check=True)
-            se_requiere_reinicio = True # Acabamos de instalar, seguro que es más nuevo
+            # Solo pedimos reinicio SI el archivo realmente existe en lo que acabamos de bajar
+            if os.path.exists(SCRIPT_SRC_PATH):
+                se_requiere_reinicio = True 
+            else:
+                log_y_print(">>> Repositorio clonado, pero el script no está en el origen. Se usará la versión local.")
         except Exception as e:
             log_y_print(f"!!! Error al clonar: {e}")
             return 
     else:
-        # 2. Si existe, comprobamos si hay cambios
+        # 2. Actualizar si existe
         try:
             os.chdir(REPO_DIR)
-            
-            # Traemos info del remoto
             subprocess.run(["git", "fetch", "origin"], check=True, stderr=subprocess.DEVNULL)
-            
-            # Aseguramos estar en la rama correcta
             subprocess.run(["git", "checkout", REPO_BRANCH], check=True, stderr=subprocess.DEVNULL)
             
-            # Comparamos hash local (HEAD) con remoto (origin/RAMA)
             local_hash = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()
             remote_hash = subprocess.check_output(["git", "rev-parse", f"origin/{REPO_BRANCH}"], text=True).strip()
             
             if local_hash != remote_hash:
                 log_y_print(f">>> Actualización detectada ({local_hash[:7]} -> {remote_hash[:7]})")
-                
-                # Forzamos update limpio
                 subprocess.run(["git", "reset", "--hard", f"origin/{REPO_BRANCH}"], check=True)
                 
-                se_requiere_reinicio = True
+                # Solo marcamos para reinicio si el script existe en el repo
+                if os.path.exists(SCRIPT_SRC_PATH):
+                    se_requiere_reinicio = True
             else:
                 log_y_print(">>> El script está actualizado.")
-        
         except Exception as e:
-            log_y_print(f"!!! Error al comprobar git: {e}")
+            log_y_print(f"!!! Error git: {e}")
 
-    # 3. Si hubo cambios, copiamos el archivo y nos reiniciamos
+    # 3. Aplicar cambios
     if se_requiere_reinicio:
-        log_y_print(">>> Aplicando nueva versión del script...")
+        log_y_print(">>> Aplicando nueva versión...")
         try:
-            if os.path.exists(SCRIPT_SRC_PATH):
-                # Copiamos del repo (/opt) al sistema (/usr/bin)
-                shutil.copy2(SCRIPT_SRC_PATH, SCRIPT_BIN_PATH)
-                os.chmod(SCRIPT_BIN_PATH, 0o755)
-                
-                log_y_print(">>> REINICIANDO SCRIPT CON NUEVA VERSIÓN...")
-                if TRAY_PROCESS: cerrar_tray_icon()
-                
-                # REINICIO MÁGICO
-                os.execv(sys.executable, ['python3'] + sys.argv)
-            else:
-                log_y_print(f"!!! Error: No encuentro el archivo fuente en {SCRIPT_SRC_PATH}")
+            shutil.copy2(SCRIPT_SRC_PATH, SCRIPT_BIN_PATH)
+            os.chmod(SCRIPT_BIN_PATH, 0o755)
+            
+            if TRAY_PROCESS: cerrar_tray_icon()
+            
+            log_y_print(">>> REINICIANDO PROCESO...")
+            os.execv(sys.executable, ['python3'] + sys.argv)
         except Exception as e:
-            log_y_print(f"!!! Error crítico al auto-actualizarse: {e}")
+            log_y_print(f"!!! Error al actualizarse a sí mismo: {e}")
 
 # ==============================================================================
-# FUNCIONES DE ICONO Y ENTORNO
+# FUNCIONES DE INTERFAZ
 # ==============================================================================
 
 def obtener_entorno_usuario(usuario):
-    """Recupera variables de entorno (DISPLAY, DBUS) del proceso de sesión."""
     env_vars = {'DISPLAY': ':0'}
     try:
         pids = subprocess.check_output(["pgrep", "-u", usuario, "-f", "session"], text=True).split()
@@ -158,19 +131,18 @@ def iniciar_tray_icon():
     global TRAY_PROCESS
     usuario = obtener_usuario_real()
     if not usuario: return
-
     entorno = os.environ.copy()
     entorno.update(obtener_entorno_usuario(usuario))
-    icono_inicial = ICONO_DEFECTO if os.path.exists(ICONO_DEFECTO) else "system-software-update"
-
-    cmd = ['sudo', '-u', usuario, 'zenity', '--notification', '--listen', f'--window-icon={icono_inicial}']
+    
+    icono = ICONO_DEFECTO if os.path.exists(ICONO_DEFECTO) else "system-software-update"
+    cmd = ['sudo', '-u', usuario, 'zenity', '--notification', '--listen', f'--window-icon={icono}']
+    
     try:
         TRAY_PROCESS = subprocess.Popen(cmd, env=entorno, stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, text=True)
-        actualizar_tray('inicio', "GuadaMint: Iniciando...")
+        actualizar_tray('inicio', "GuadaMint Iniciando...")
     except: pass
 
 def actualizar_tray(estado, mensaje=""):
-    """Envía comandos al icono de la bandeja."""
     global TRAY_PROCESS
     if not TRAY_PROCESS or TRAY_PROCESS.poll() is not None: return
     
@@ -183,7 +155,6 @@ def actualizar_tray(estado, mensaje=""):
     icono = iconos.get(estado, 'info')
     
     try:
-        # message: fuerza la burbuja de notificación
         if mensaje: TRAY_PROCESS.stdin.write(f"message: {mensaje}\n")
         TRAY_PROCESS.stdin.write(f"icon: {icono}\n")
         TRAY_PROCESS.stdin.flush()
@@ -196,7 +167,6 @@ def cerrar_tray_icon():
         except: pass
 
 def mostrar_aviso(titulo, mensaje, icono="info"):
-    """Muestra una ventana Zenity (popup)."""
     usuario = obtener_usuario_real()
     if not usuario: return
     entorno = os.environ.copy()
@@ -211,7 +181,6 @@ def detectar_escritorio():
     return "DESCONOCIDO"
 
 def ejecutar_comando(comando, visible=False):
-    """Ejecuta comandos apt (root directo porque el script es root)."""
     try:
         env = os.environ.copy()
         env['DEBIAN_FRONTEND'] = 'noninteractive'
@@ -224,7 +193,6 @@ def ejecutar_comando(comando, visible=False):
         return False
 
 def verificar_e_instalar_apps():
-    """Comprueba apps obligatorias e instala si faltan."""
     faltantes = []
     actualizar_tray('inicio', "Verificando software educativo...")
     
@@ -259,20 +227,16 @@ def main():
     
     iniciar_tray_icon()
     try:
-        # 1. AUTO-UPDATE GIT
         auto_actualizar_desde_git()
 
-        # 2. LÓGICA PRINCIPAL
         escritorio = detectar_escritorio()
         log_y_print(f">>> Escritorio: {escritorio}")
         
         verificar_e_instalar_apps()
         
-        # 3. Lógica Futura (Condicionales)
         if escritorio == "XFCE": pass
         elif escritorio == "CINNAMON": pass
 
-        # 4. Finalización
         wait = random.randint(5, 10)
         time.sleep(wait)
         
