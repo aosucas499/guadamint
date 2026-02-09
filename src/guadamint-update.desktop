@@ -1,15 +1,20 @@
 [Desktop Entry]
 Type=Application
 Name=GuadaMint Updater
-Name[es_ES]=Apps-guadalinex-20
+Name[es_ES]=Guadamint Update
 Comment=Actualizador automático escolar
 Comment[es_ES]=Actualizador de guadamint
+# IMPORTANTE: Ejecutamos con sudo (no pedirá clave gracias a la configuración en sudoers)
+# Apunta al script instalado en /usr/bin/
 Exec=sudo /usr/bin/guadamint-update.py
+# Ruta del icono instalado
 Icon=/usr/share/icons/guadamintuz.svg
+# Terminal=false para que no se abra una ventana negra al inicio
 Terminal=true
 Categories=System;Settings;
+# Configuración para inicio automático en GNOME/Cinnamon/XFCE
 X-GNOME-Autostart-enabled=true
-# Esperamos 5 segundos para asegurar que el escritorio cargó bien
+# Retraso de 5 segundos para asegurar que el escritorio cargó completamente
 X-GNOME-Autostart-Delay=5
 NoDisplay=false
 Hidden=false
