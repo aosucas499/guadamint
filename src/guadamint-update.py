@@ -31,7 +31,7 @@ APPS_OBLIGATORIAS = [
     "kgeography", "kwordquiz", "klettres", "khangman", "kanagram", 
     "stellarium", "kalzium", "step", "gbrainy", "marble",
     "scratch", "kturtle", "thonny", "minetest",
-    "gcompris-qt", "audacity", "openboard", 
+    "gcompris-qt", "audacity", "openboard", "klavaro", 
 ]
 
 logging.basicConfig(filename=LOG_FILE, level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
