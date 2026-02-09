@@ -7,18 +7,24 @@ import time
 import shutil
 import random
 import filecmp
-import json # Necesario para Cinnamon
-import glob # Necesario para buscar archivos de config
 
 # ==============================================================================
 # CONFIGURACIÓN
 # ==============================================================================
 LOG_FILE = "/var/log/guadamint/actualizador.log"
 LOCK_FILE = "/tmp/guadamint-updating.lock"
-ICONO_DEFECTO = "/usr/share/icons/guadamintuz.svg"
 
-# EL NUEVO LOGO PARA EL MENÚ DE INICIO
-LOGO_MENU = "/usr/share/icons/guadamintuz.svg"
+# NUESTRO ICONO (ORIGEN)
+ICONO_PROPIO = "/usr/share/icons/guadamintuz.svg"
+
+# LOS ICONOS DEL SISTEMA QUE VAMOS A SUSTITUIR (DESTINOS)
+# Estos son los nombres estándar que usa Mint. Al sobrescribirlos, cambiamos el logo en todo el sistema.
+ICONOS_A_REEMPLAZAR = [
+    "/usr/share/icons/linuxmint-logo-ring.svg",  # El círculo verde clásico
+    "/usr/share/icons/linuxmint-logo-leaf.svg",  # La hoja sola
+    "/usr/share/icons/linuxmint-logo.svg",       # Logo genérico
+    "/usr/share/icons/start-here.svg"            # Estándar freedesktop
+]
 
 # --- CONFIGURACIÓN GIT ---
 REPO_URL = "https://github.com/aosucas499/guadamint.git"
@@ -54,104 +60,54 @@ def obtener_usuario_real():
     return os.environ.get('SUDO_USER')
 
 # ==============================================================================
-# PERSONALIZACIÓN DEL MENÚ DE INICIO
+# PERSONALIZACIÓN ("EL CAMBIAZO")
 # ==============================================================================
 
-def cambiar_icono_xfce(usuario, ruta_icono):
-    """Cambia el icono del Whisker Menu en XFCE."""
-    try:
-        home = f"/home/{usuario}"
-        config_path = f"{home}/.config/xfce4/panel"
-        
-        # Buscamos todos los archivos de configuración de whiskermenu (puede haber varios)
-        archivos = glob.glob(f"{config_path}/whiskermenu-*.rc")
-        
-        cambio_hecho = False
-        for archivo in archivos:
-            # Leemos el archivo
-            with open(archivo, 'r') as f:
-                lineas = f.readlines()
-            
-            # Escribimos con el cambio
-            with open(archivo, 'w') as f:
-                for linea in lineas:
-                    if linea.strip().startswith("button-icon="):
-                        # Si el icono ya es el nuestro, no tocamos nada para no reiniciar el panel a lo tonto
-                        if ruta_icono in linea:
-                            continue
-                        f.write(f"button-icon={ruta_icono}\n")
-                        cambio_hecho = True
-                    else:
-                        f.write(linea)
-            
-            # Restauramos dueño del archivo (al editar como root, puede cambiar a root)
-            shutil.chown(archivo, user=usuario, group=usuario)
-
-        if cambio_hecho:
-            log_y_print(f">>> Icono XFCE actualizado en {len(archivos)} paneles.")
-            # Recargamos el panel suavemente para que se vea el cambio
-            subprocess.Popen(['sudo', '-u', usuario, 'xfce4-panel', '-r'], 
-                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-            return True
-            
-    except Exception as e:
-        log_y_print(f"!!! Error cambiando icono XFCE: {e}")
-    return False
-
-def cambiar_icono_cinnamon(usuario, ruta_icono):
-    """Cambia el icono del Applet de Menú en Cinnamon."""
-    try:
-        home = f"/home/{usuario}"
-        # Ruta típica de configs de applets
-        base_path = f"{home}/.cinnamon/configs/menu@cinnamon.org"
-        
-        if not os.path.exists(base_path):
-            return False
-
-        # Puede haber varios JSON (uno por cada panel/monitor)
-        archivos = glob.glob(f"{base_path}/*.json")
-        
-        cambio_hecho = False
-        for archivo in archivos:
-            try:
-                with open(archivo, 'r') as f:
-                    data = json.load(f)
-                
-                # Navegamos el JSON: panel-icon -> value
-                if "panel-icon" in data and "value" in data["panel-icon"]:
-                    if data["panel-icon"]["value"] != ruta_icono:
-                        data["panel-icon"]["value"] = ruta_icono
-                        
-                        with open(archivo, 'w') as f:
-                            json.dump(data, f, indent=4)
-                        
-                        shutil.chown(archivo, user=usuario, group=usuario)
-                        cambio_hecho = True
-            except: continue
-
-        if cambio_hecho:
-            log_y_print(">>> Icono Cinnamon configurado (se verá al reiniciar sesión).")
-            return True
-
-    except Exception as e:
-        log_y_print(f"!!! Error cambiando icono Cinnamon: {e}")
-    return False
-
 def personalizar_menu_inicio():
-    """Detecta el entorno y aplica el logo corporativo."""
-    if not os.path.exists(LOGO_MENU):
-        log_y_print(f"!!! No encuentro el logo: {LOGO_MENU}")
+    """
+    Sobrescribe los iconos del sistema con nuestro logo corporativo.
+    Así no hace falta configurar nada en el escritorio del usuario.
+    """
+    log_y_print("--- Aplicando imagen corporativa (Sobrescribiendo logos) ---")
+    
+    if not os.path.exists(ICONO_PROPIO):
+        log_y_print(f"!!! Error: No encuentro nuestro icono en {ICONO_PROPIO}")
         return
 
-    usuario = obtener_usuario_real()
-    if not usuario: return
+    cambios_hechos = False
 
-    escritorio = detectar_escritorio()
-    
-    if escritorio == "XFCE":
-        cambiar_icono_xfce(usuario, LOGO_MENU)
-    elif escritorio == "CINNAMON":
-        cambiar_icono_cinnamon(usuario, LOGO_MENU)
+    for destino in ICONOS_A_REEMPLAZAR:
+        # Solo reemplazamos si el archivo destino existe (para no llenar basura)
+        # O si es un enlace simbólico (lo rompemos y ponemos nuestro archivo)
+        if os.path.exists(destino) or os.path.islink(destino):
+            try:
+                # Comparamos si ya son iguales para no escribir a lo tonto
+                # filecmp.cmp devuelve True si son iguales
+                if os.path.exists(destino) and filecmp.cmp(ICONO_PROPIO, destino, shallow=False):
+                    continue # Ya está actualizado
+
+                log_y_print(f"   > Reemplazando: {os.path.basename(destino)}")
+                
+                # Si es un enlace simbólico, lo borramos primero
+                if os.path.islink(destino):
+                    os.unlink(destino)
+                
+                # Copiamos nuestro icono machacando el destino
+                shutil.copy2(ICONO_PROPIO, destino)
+                
+                # Permisos de lectura para todos
+                os.chmod(destino, 0o644)
+                cambios_hechos = True
+            except Exception as e:
+                log_y_print(f"!!! Error reemplazando {destino}: {e}")
+
+    if cambios_hechos:
+        log_y_print(">>> Logos del sistema actualizados. Refrescando caché de iconos...")
+        # Forzamos la actualización de la caché de iconos para que se vea inmediato
+        try:
+            subprocess.run(['gtk-update-icon-cache', '-f', '-t', '/usr/share/icons/hicolor'], 
+                         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        except: pass
 
 # ==============================================================================
 # SISTEMA DE AUTO-ACTUALIZACIÓN (GIT)
@@ -161,7 +117,6 @@ def auto_actualizar_desde_git():
     log_y_print(f"--- Comprobando actualizaciones del repositorio (Rama: {REPO_BRANCH}) ---")
     se_requiere_reinicio = False
 
-    # 1. Clonar si no existe
     if not os.path.exists(REPO_DIR):
         log_y_print(f">>> Clonando repositorio en {REPO_DIR}...")
         try:
@@ -174,7 +129,6 @@ def auto_actualizar_desde_git():
             log_y_print(f"!!! Error al clonar: {e}")
             return 
     else:
-        # 2. Actualizar si existe
         try:
             os.chdir(REPO_DIR)
             subprocess.run(["git", "fetch", "origin", REPO_BRANCH], check=True, stderr=subprocess.DEVNULL)
@@ -193,7 +147,6 @@ def auto_actualizar_desde_git():
             else:
                 log_y_print(">>> Git está sincronizado.")
                 
-                # INTEGRIDAD
                 if os.path.exists(SCRIPT_SRC_PATH):
                     if not filecmp.cmp(SCRIPT_SRC_PATH, SCRIPT_BIN_PATH, shallow=False):
                         log_y_print(">>> ¡ALERTA! El script instalado difiere del repositorio. Forzando actualización...")
@@ -202,7 +155,6 @@ def auto_actualizar_desde_git():
         except Exception as e:
             log_y_print(f"!!! Error git: {e}")
 
-    # 3. Aplicar cambios
     if se_requiere_reinicio:
         log_y_print(">>> APLICANDO CAMBIOS Y REINICIANDO...")
         try:
@@ -346,8 +298,7 @@ def main():
         escritorio = detectar_escritorio()
         log_y_print(f">>> Escritorio: {escritorio}")
         
-        # 3. PERSONALIZACIÓN (CAMBIO DE ICONO MENÚ)
-        # Lo hacemos antes de verificar apps para que se vea rápido
+        # 3. PERSONALIZACIÓN ("EL CAMBIAZO")
         personalizar_menu_inicio()
         
         # 4. VERIFICACIÓN APPS
