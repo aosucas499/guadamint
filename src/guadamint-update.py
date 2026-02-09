@@ -13,7 +13,7 @@ import random
 LOG_FILE = "/var/log/guadamint/actualizador.log"
 LOCK_FILE = "/tmp/guadamint-updating.lock"
 ICONO_DEFECTO = "/usr/share/icons/guadamintuz.svg"
-#
+
 # --- CONFIGURACIÓN GIT ---
 # URL CORREGIDA: Apunta al repositorio 'guadamint'
 REPO_URL = "https://github.com/aosucas499/guadamint.git"
