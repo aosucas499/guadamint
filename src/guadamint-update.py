@@ -7,6 +7,7 @@ import time
 import shutil
 import random
 import filecmp
+import glob
 
 # ==============================================================================
 # CONFIGURACIÓN
@@ -14,15 +15,26 @@ import filecmp
 LOG_FILE = "/var/log/guadamint/actualizador.log"
 LOCK_FILE = "/tmp/guadamint-updating.lock"
 
-# ICONO PRINCIPAL (Usado tanto para la bandeja como para reemplazar el logo del menú)
+# ICONO PRINCIPAL
 ICONO_DEFECTO = "/usr/share/icons/guadamintuz.svg"
 
-# LOS ICONOS DEL SISTEMA QUE VAMOS A SUSTITUIR (DESTINOS)
+# LISTA DE POSIBLES UBICACIONES DEL LOGO EN LINUX MINT / XFCE
+# El script intentará reemplazar todos los que encuentre de esta lista.
 ICONOS_A_REEMPLAZAR = [
-    "/usr/share/icons/linuxmint-logo-ring.svg",  # El círculo verde clásico
-    "/usr/share/icons/linuxmint-logo-leaf.svg",  # La hoja sola
-    "/usr/share/icons/linuxmint-logo.svg",       # Logo genérico
-    "/usr/share/icons/start-here.svg"            # Estándar freedesktop
+    # Ubicaciones de branding de Linux Mint
+    "/usr/share/linuxmint/logo/linuxmint-logo-ring.svg",
+    "/usr/share/linuxmint/logo/linuxmint-logo-leaf.svg",
+    "/usr/share/linuxmint/logo/linuxmint-logo.svg",
+    
+    # Iconos estándar de menú (start-here) en temas comunes
+    "/usr/share/icons/Mint-Y/places/scalable/start-here.svg",
+    "/usr/share/icons/Mint-Y/places/symbolic/start-here-symbolic.svg",
+    "/usr/share/icons/Mint-X/places/scalable/start-here.svg",
+    "/usr/share/icons/hicolor/scalable/apps/linuxmint-logo.svg",
+    "/usr/share/icons/hicolor/scalable/apps/start-here.svg",
+    
+    # XFCE a veces usa este
+    "/usr/share/pixmaps/xfce4_xicon.png"
 ]
 
 # --- CONFIGURACIÓN GIT ---
@@ -74,30 +86,39 @@ def personalizar_menu_inicio():
 
     cambios_hechos = False
 
+    # 1. Reemplazo directo por lista
     for destino in ICONOS_A_REEMPLAZAR:
-        if os.path.exists(destino) or os.path.islink(destino):
+        # También comprobamos si existe en subcarpetas de temas si la ruta es relativa (no empieza por /)
+        if os.path.exists(destino):
             try:
-                # Comparamos si ya son iguales
-                if os.path.exists(destino) and filecmp.cmp(ICONO_DEFECTO, destino, shallow=False):
+                # Si es enlace simbólico, miramos a dónde apunta realmente
+                ruta_real = os.path.realpath(destino)
+                
+                if os.path.exists(ruta_real) and filecmp.cmp(ICONO_DEFECTO, ruta_real, shallow=False):
                     continue 
 
-                log_y_print(f"   > Reemplazando: {os.path.basename(destino)}")
+                log_y_print(f"   > Reemplazando: {destino}")
                 
-                if os.path.islink(destino):
-                    os.unlink(destino)
+                # Si es enlace, lo borramos para poner el archivo real (o copiamos sobre el destino real)
+                # Estrategia segura: Copiar sobre el destino real para mantener enlaces de otros temas
+                shutil.copy2(ICONO_DEFECTO, ruta_real)
                 
-                shutil.copy2(ICONO_DEFECTO, destino)
-                os.chmod(destino, 0o644)
+                os.chmod(ruta_real, 0o644)
                 cambios_hechos = True
             except Exception as e:
                 log_y_print(f"!!! Error reemplazando {destino}: {e}")
 
+    # 2. Refresco de caché
     if cambios_hechos:
-        log_y_print(">>> Logos del sistema actualizados. Refrescando caché de iconos...")
+        log_y_print(">>> Logos del sistema actualizados. Refrescando caché...")
         try:
+            subprocess.run(['gtk-update-icon-cache', '-f', '-t', '/usr/share/icons/Mint-Y'], 
+                         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             subprocess.run(['gtk-update-icon-cache', '-f', '-t', '/usr/share/icons/hicolor'], 
                          stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         except: pass
+    else:
+        log_y_print(">>> No se encontraron iconos para reemplazar o ya estaban actualizados.")
 
 # ==============================================================================
 # SISTEMA DE AUTO-ACTUALIZACIÓN (GIT)
@@ -188,7 +209,6 @@ def iniciar_tray_icon():
     entorno = os.environ.copy()
     entorno.update(obtener_entorno_usuario(usuario))
     
-    # Usamos ICONO_DEFECTO que ahora está definido globalmente
     icono = ICONO_DEFECTO if os.path.exists(ICONO_DEFECTO) else "system-software-update"
     cmd = ['sudo', '-u', usuario, 'zenity', '--notification', '--listen', f'--window-icon={icono}']
     
