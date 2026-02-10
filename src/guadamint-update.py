@@ -6,8 +6,6 @@ import sys
 import time
 import shutil
 import random
-import filecmp
-import glob
 
 # ==============================================================================
 # CONFIGURACIÓN
@@ -15,27 +13,8 @@ import glob
 LOG_FILE = "/var/log/guadamint/actualizador.log"
 LOCK_FILE = "/tmp/guadamint-updating.lock"
 
-# ICONO PRINCIPAL
+# ICONO PARA LA BANDEJA DEL SISTEMA
 ICONO_DEFECTO = "/usr/share/icons/guadamintuz.svg"
-
-# LISTA DE POSIBLES UBICACIONES DEL LOGO EN LINUX MINT / XFCE
-# El script intentará reemplazar todos los que encuentre de esta lista.
-ICONOS_A_REEMPLAZAR = [
-    # Ubicaciones de branding de Linux Mint
-    "/usr/share/linuxmint/logo/linuxmint-logo-ring.svg",
-    "/usr/share/linuxmint/logo/linuxmint-logo-leaf.svg",
-    "/usr/share/linuxmint/logo/linuxmint-logo.svg",
-    
-    # Iconos estándar de menú (start-here) en temas comunes
-    "/usr/share/icons/Mint-Y/places/scalable/start-here.svg",
-    "/usr/share/icons/Mint-Y/places/symbolic/start-here-symbolic.svg",
-    "/usr/share/icons/Mint-X/places/scalable/start-here.svg",
-    "/usr/share/icons/hicolor/scalable/apps/linuxmint-logo.svg",
-    "/usr/share/icons/hicolor/scalable/apps/start-here.svg",
-    
-    # XFCE a veces usa este
-    "/usr/share/pixmaps/xfce4_xicon.png"
-]
 
 # --- CONFIGURACIÓN GIT ---
 REPO_URL = "https://github.com/aosucas499/guadamint.git"
@@ -71,56 +50,6 @@ def obtener_usuario_real():
     return os.environ.get('SUDO_USER')
 
 # ==============================================================================
-# PERSONALIZACIÓN ("EL CAMBIAZO")
-# ==============================================================================
-
-def personalizar_menu_inicio():
-    """
-    Sobrescribe los iconos del sistema con nuestro logo corporativo.
-    """
-    log_y_print("--- Aplicando imagen corporativa (Sobrescribiendo logos) ---")
-    
-    if not os.path.exists(ICONO_DEFECTO):
-        log_y_print(f"!!! Error: No encuentro nuestro icono en {ICONO_DEFECTO}")
-        return
-
-    cambios_hechos = False
-
-    # 1. Reemplazo directo por lista
-    for destino in ICONOS_A_REEMPLAZAR:
-        # También comprobamos si existe en subcarpetas de temas si la ruta es relativa (no empieza por /)
-        if os.path.exists(destino):
-            try:
-                # Si es enlace simbólico, miramos a dónde apunta realmente
-                ruta_real = os.path.realpath(destino)
-                
-                if os.path.exists(ruta_real) and filecmp.cmp(ICONO_DEFECTO, ruta_real, shallow=False):
-                    continue 
-
-                log_y_print(f"   > Reemplazando: {destino}")
-                
-                # Si es enlace, lo borramos para poner el archivo real (o copiamos sobre el destino real)
-                # Estrategia segura: Copiar sobre el destino real para mantener enlaces de otros temas
-                shutil.copy2(ICONO_DEFECTO, ruta_real)
-                
-                os.chmod(ruta_real, 0o644)
-                cambios_hechos = True
-            except Exception as e:
-                log_y_print(f"!!! Error reemplazando {destino}: {e}")
-
-    # 2. Refresco de caché
-    if cambios_hechos:
-        log_y_print(">>> Logos del sistema actualizados. Refrescando caché...")
-        try:
-            subprocess.run(['gtk-update-icon-cache', '-f', '-t', '/usr/share/icons/Mint-Y'], 
-                         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-            subprocess.run(['gtk-update-icon-cache', '-f', '-t', '/usr/share/icons/hicolor'], 
-                         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        except: pass
-    else:
-        log_y_print(">>> No se encontraron iconos para reemplazar o ya estaban actualizados.")
-
-# ==============================================================================
 # SISTEMA DE AUTO-ACTUALIZACIÓN (GIT)
 # ==============================================================================
 
@@ -128,6 +57,7 @@ def auto_actualizar_desde_git():
     log_y_print(f"--- Comprobando actualizaciones del repositorio (Rama: {REPO_BRANCH}) ---")
     se_requiere_reinicio = False
 
+    # 1. Clonar si no existe
     if not os.path.exists(REPO_DIR):
         log_y_print(f">>> Clonando repositorio en {REPO_DIR}...")
         try:
@@ -140,9 +70,12 @@ def auto_actualizar_desde_git():
             log_y_print(f"!!! Error al clonar: {e}")
             return 
     else:
+        # 2. Actualizar si existe
         try:
             os.chdir(REPO_DIR)
-            subprocess.run(["git", "fetch", "origin", REPO_BRANCH], check=True, stderr=subprocess.DEVNULL)
+            
+            # Fetch silencioso (o verbose si quieres debug)
+            subprocess.run(["git", "fetch", "origin"], check=True, stderr=subprocess.DEVNULL)
             subprocess.run(["git", "checkout", REPO_BRANCH], check=True, stderr=subprocess.DEVNULL)
             
             local_hash = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()
@@ -158,14 +91,14 @@ def auto_actualizar_desde_git():
             else:
                 log_y_print(">>> Git está sincronizado.")
                 
-                if os.path.exists(SCRIPT_SRC_PATH):
-                    if not filecmp.cmp(SCRIPT_SRC_PATH, SCRIPT_BIN_PATH, shallow=False):
-                        log_y_print(">>> ¡ALERTA! El script instalado difiere del repositorio. Forzando actualización...")
-                        se_requiere_reinicio = True
+                # Integridad básica: si el archivo de repo existe y el de sistema no, o son distintos...
+                # (Omitimos filecmp complejo, confiamos en Git para simplificar, pero si quieres integridad total descomenta lo de abajo)
+                # if os.path.exists(SCRIPT_SRC_PATH) and not os.path.exists(SCRIPT_BIN_PATH): se_requiere_reinicio = True
 
         except Exception as e:
             log_y_print(f"!!! Error git: {e}")
 
+    # 3. Aplicar cambios y reiniciar
     if se_requiere_reinicio:
         log_y_print(">>> APLICANDO CAMBIOS Y REINICIANDO...")
         try:
@@ -174,6 +107,8 @@ def auto_actualizar_desde_git():
                 os.chmod(SCRIPT_BIN_PATH, 0o755)
                 
                 if TRAY_PROCESS: cerrar_tray_icon()
+                
+                log_y_print(">>> REINICIANDO PROCESO...")
                 time.sleep(1)
                 os.execv(sys.executable, ['python3'] + sys.argv)
             else:
@@ -182,7 +117,7 @@ def auto_actualizar_desde_git():
             log_y_print(f"!!! Error crítico update: {e}")
 
 # ==============================================================================
-# FUNCIONES DE INTERFAZ
+# FUNCIONES DE INTERFAZ (TRAY / ZENITY)
 # ==============================================================================
 
 def obtener_entorno_usuario(usuario):
@@ -192,8 +127,8 @@ def obtener_entorno_usuario(usuario):
         for pid in pids:
             try:
                 with open(f"/proc/{pid}/environ", "rb") as f:
-                    contenido = f.read().decode("utf-8", errors="ignore")
-                for item in contenido.split('\0'):
+                    content = f.read().decode("utf-8", errors="ignore")
+                for item in content.split('\0'):
                     if item.startswith("DBUS_SESSION_BUS_ADDRESS=") or item.startswith("DISPLAY="):
                         k, v = item.split("=", 1)
                         env_vars[k] = v
@@ -309,13 +244,10 @@ def main():
         escritorio = detectar_escritorio()
         log_y_print(f">>> Escritorio: {escritorio}")
         
-        # 3. PERSONALIZACIÓN ("EL CAMBIAZO")
-        personalizar_menu_inicio()
-        
-        # 4. VERIFICACIÓN APPS
+        # 3. VERIFICACIÓN APPS
         verificar_e_instalar_apps()
         
-        # 5. Finalización
+        # 4. Finalización
         wait = random.randint(5, 10)
         time.sleep(wait)
         
