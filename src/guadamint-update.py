@@ -12,8 +12,6 @@ import random
 # ==============================================================================
 LOG_FILE = "/var/log/guadamint/actualizador.log"
 LOCK_FILE = "/tmp/guadamint-updating.lock"
-
-# ICONO PARA LA BANDEJA DEL SISTEMA
 ICONO_DEFECTO = "/usr/share/icons/guadamintuz.svg"
 
 # --- CONFIGURACIÓN GIT ---
@@ -50,6 +48,51 @@ def obtener_usuario_real():
     return os.environ.get('SUDO_USER')
 
 # ==============================================================================
+# GESTIÓN DE USUARIOS
+# ==============================================================================
+
+def verificar_crear_usuario_alumno():
+    """
+    Verifica si existe el usuario 'usuario'.
+    Si no, lo crea con contraseña 'usuario' y sin permisos de sudo.
+    """
+    NOMBRE_USUARIO = "usuario"
+    PASSWORD = "usuario"
+    
+    log_y_print(f"--- Verificando existencia del usuario '{NOMBRE_USUARIO}' ---")
+    
+    try:
+        # id -u devuelve 0 si existe, error si no
+        subprocess.run(["id", "-u", NOMBRE_USUARIO], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        # Si no falla, es que existe
+        # log_y_print(f">>> El usuario '{NOMBRE_USUARIO}' ya existe.") 
+    except subprocess.CalledProcessError:
+        log_y_print(f">>> El usuario '{NOMBRE_USUARIO}' NO existe. Creando...")
+        
+        # Notificar visualmente
+        actualizar_tray('trabajando', "Creando usuario alumno...")
+        mostrar_aviso("Configuración Inicial", f"Creando usuario '{NOMBRE_USUARIO}'...")
+        
+        try:
+            # 1. Crear usuario (-m crea home, -s define shell, -U crea grupo propio)
+            # Por defecto NO se añade a sudoers
+            subprocess.run(["useradd", "-m", "-s", "/bin/bash", "-c", "Usuario Alumno", "-U", NOMBRE_USUARIO], check=True)
+            
+            # 2. Establecer contraseña
+            # Usamos chpasswd para pasarla por pipe de forma segura
+            proceso_pass = subprocess.Popen(["chpasswd"], stdin=subprocess.PIPE, text=True)
+            proceso_pass.communicate(input=f"{NOMBRE_USUARIO}:{PASSWORD}")
+            
+            if proceso_pass.returncode == 0:
+                log_y_print(f">>> Usuario '{NOMBRE_USUARIO}' creado correctamente.")
+                mostrar_aviso("GuadaMint", f"Se ha creado el usuario '{NOMBRE_USUARIO}' correctamente.")
+            else:
+                log_y_print("!!! Error al establecer la contraseña.")
+                
+        except Exception as e:
+            log_y_print(f"!!! Error crítico creando usuario: {e}")
+
+# ==============================================================================
 # SISTEMA DE AUTO-ACTUALIZACIÓN (GIT)
 # ==============================================================================
 
@@ -57,7 +100,6 @@ def auto_actualizar_desde_git():
     log_y_print(f"--- Comprobando actualizaciones del repositorio (Rama: {REPO_BRANCH}) ---")
     se_requiere_reinicio = False
 
-    # 1. Clonar si no existe
     if not os.path.exists(REPO_DIR):
         log_y_print(f">>> Clonando repositorio en {REPO_DIR}...")
         try:
@@ -70,11 +112,8 @@ def auto_actualizar_desde_git():
             log_y_print(f"!!! Error al clonar: {e}")
             return 
     else:
-        # 2. Actualizar si existe
         try:
             os.chdir(REPO_DIR)
-            
-            # Fetch silencioso (o verbose si quieres debug)
             subprocess.run(["git", "fetch", "origin"], check=True, stderr=subprocess.DEVNULL)
             subprocess.run(["git", "checkout", REPO_BRANCH], check=True, stderr=subprocess.DEVNULL)
             
@@ -91,14 +130,12 @@ def auto_actualizar_desde_git():
             else:
                 log_y_print(">>> Git está sincronizado.")
                 
-                # Integridad básica: si el archivo de repo existe y el de sistema no, o son distintos...
-                # (Omitimos filecmp complejo, confiamos en Git para simplificar, pero si quieres integridad total descomenta lo de abajo)
+                # Integridad básica (opcional, dejamos que git mande)
                 # if os.path.exists(SCRIPT_SRC_PATH) and not os.path.exists(SCRIPT_BIN_PATH): se_requiere_reinicio = True
 
         except Exception as e:
             log_y_print(f"!!! Error git: {e}")
 
-    # 3. Aplicar cambios y reiniciar
     if se_requiere_reinicio:
         log_y_print(">>> APLICANDO CAMBIOS Y REINICIANDO...")
         try:
@@ -244,10 +281,13 @@ def main():
         escritorio = detectar_escritorio()
         log_y_print(f">>> Escritorio: {escritorio}")
         
-        # 3. VERIFICACIÓN APPS
+        # 3. GESTIÓN USUARIOS (NUEVO)
+        verificar_crear_usuario_alumno()
+        
+        # 4. VERIFICACIÓN APPS
         verificar_e_instalar_apps()
         
-        # 4. Finalización
+        # 5. Finalización
         wait = random.randint(5, 10)
         time.sleep(wait)
         
