@@ -48,8 +48,43 @@ def obtener_usuario_real():
     return os.environ.get('SUDO_USER')
 
 # ==============================================================================
-# GESTIÓN DE USUARIOS
+# GESTIÓN DE PRIVACIDAD Y USUARIOS
 # ==============================================================================
+
+def ocultar_lista_usuarios_login():
+    """
+    Configura LightDM para que NO muestre la lista de usuarios al arrancar.
+    El usuario tendrá que escribir su nombre manualmente.
+    """
+    log_y_print("--- Configurando privacidad del Login (Ocultar lista usuarios) ---")
+    
+    config_dir = "/etc/lightdm/lightdm.conf.d"
+    config_file = os.path.join(config_dir, "99-guadamint-privacy.conf")
+    
+    # Contenido para ocultar usuarios y deshabilitar invitado
+    contenido = "[Seat:*]\ngreeter-hide-users=true\nallow-guest=false\n"
+    
+    try:
+        if not os.path.exists(config_dir):
+            os.makedirs(config_dir)
+        
+        # Comprobamos si ya está configurado para no escribir innecesariamente
+        escribir = True
+        if os.path.exists(config_file):
+            with open(config_file, 'r') as f:
+                if f.read() == contenido:
+                    escribir = False
+        
+        if escribir:
+            with open(config_file, 'w') as f:
+                f.write(contenido)
+            log_y_print(">>> Configuración aplicada: Lista de usuarios oculta.")
+        else:
+            # log_y_print(">>> La configuración de privacidad ya estaba aplicada.")
+            pass
+            
+    except Exception as e:
+        log_y_print(f"!!! Error configurando LightDM: {e}")
 
 def verificar_crear_usuario_alumno():
     """
@@ -62,24 +97,16 @@ def verificar_crear_usuario_alumno():
     log_y_print(f"--- Verificando existencia del usuario '{NOMBRE_USUARIO}' ---")
     
     try:
-        # id -u devuelve 0 si existe, error si no
         subprocess.run(["id", "-u", NOMBRE_USUARIO], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        # Si no falla, es que existe
-        # log_y_print(f">>> El usuario '{NOMBRE_USUARIO}' ya existe.") 
     except subprocess.CalledProcessError:
         log_y_print(f">>> El usuario '{NOMBRE_USUARIO}' NO existe. Creando...")
         
-        # Notificar visualmente
-        actualizar_tray('trabajando', "Creando usuario alumno...")
+        actualizar_tray('trabajando', "Creando usuario...")
         mostrar_aviso("Configuración Inicial", f"Creando usuario '{NOMBRE_USUARIO}'...")
         
         try:
-            # 1. Crear usuario (-m crea home, -s define shell, -U crea grupo propio)
-            # Por defecto NO se añade a sudoers
-            subprocess.run(["useradd", "-m", "-s", "/bin/bash", "-c", "Usuario Alumno", "-U", NOMBRE_USUARIO], check=True)
+            subprocess.run(["useradd", "-m", "-s", "/bin/bash", "-c", "Usuario", "-U", NOMBRE_USUARIO], check=True)
             
-            # 2. Establecer contraseña
-            # Usamos chpasswd para pasarla por pipe de forma segura
             proceso_pass = subprocess.Popen(["chpasswd"], stdin=subprocess.PIPE, text=True)
             proceso_pass.communicate(input=f"{NOMBRE_USUARIO}:{PASSWORD}")
             
@@ -164,8 +191,8 @@ def obtener_entorno_usuario(usuario):
         for pid in pids:
             try:
                 with open(f"/proc/{pid}/environ", "rb") as f:
-                    content = f.read().decode("utf-8", errors="ignore")
-                for item in content.split('\0'):
+                    contenido = f.read().decode("utf-8", errors="ignore")
+                for item in contenido.split('\0'):
                     if item.startswith("DBUS_SESSION_BUS_ADDRESS=") or item.startswith("DISPLAY="):
                         k, v = item.split("=", 1)
                         env_vars[k] = v
@@ -281,13 +308,17 @@ def main():
         escritorio = detectar_escritorio()
         log_y_print(f">>> Escritorio: {escritorio}")
         
-        # 3. GESTIÓN USUARIOS (NUEVO)
+        # 3. GESTIÓN USUARIOS
         verificar_crear_usuario_alumno()
         
-        # 4. VERIFICACIÓN APPS
+        # 4. PRIVACIDAD (NUEVO)
+        # Ocultar usuarios en el login
+        ocultar_lista_usuarios_login()
+        
+        # 5. VERIFICACIÓN APPS
         verificar_e_instalar_apps()
         
-        # 5. Finalización
+        # 6. Finalización
         wait = random.randint(5, 10)
         time.sleep(wait)
         
