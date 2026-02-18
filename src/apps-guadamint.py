@@ -8,6 +8,7 @@ import sys
 import threading
 import shutil
 import grp
+import time
 
 # ==============================================================================
 # CONFIGURACIÓN VISUAL
@@ -16,6 +17,8 @@ ICONO_APP = "/usr/share/icons/guadamintuz.svg"
 TITULO_APP = "Centro de Software GuadaMint"
 
 # --- CATÁLOGO DE APLICACIONES ---
+# Nota: He quitado 'anydesk' porque no está en los repositorios oficiales y da error.
+# Solo dejamos paquetes que seguro existen en Linux Mint / Ubuntu.
 CATALOGO = [
     {
         "categoria": "Educación",
@@ -25,6 +28,7 @@ CATALOGO = [
             {"id": "scratch", "nombre": "Scratch", "desc": "Aprender a programar", "icono": "scratch"},
             {"id": "gcompris-qt", "nombre": "GCompris", "desc": "Suite educativa infantil", "icono": "gcompris-qt"},
             {"id": "klavaro", "nombre": "Klavaro", "desc": "Tutor de mecanografía", "icono": "klavaro"},
+            {"id": "tuxpaint", "nombre": "Tux Paint", "desc": "Dibujo para niños", "icono": "tuxpaint"},
         ]
     },
     {
@@ -33,15 +37,15 @@ CATALOGO = [
             {"id": "blender", "nombre": "Blender", "desc": "Modelado y animación 3D", "icono": "blender"},
             {"id": "inkscape", "nombre": "Inkscape", "desc": "Editor de gráficos vectoriales", "icono": "inkscape"},
             {"id": "audacity", "nombre": "Audacity", "desc": "Editor de audio", "icono": "audacity"},
-            {"id": "obs-studio", "nombre": "OBS Studio", "desc": "Grabación y streaming", "icono": "com.obsproject.Studio"},
+            {"id": "obs-studio", "nombre": "OBS Studio", "desc": "Grabación y streaming", "icono": "obs"},
         ]
     },
     {
         "categoria": "Utilidades",
         "apps": [
             {"id": "vlc", "nombre": "VLC", "desc": "Reproductor multimedia", "icono": "vlc"},
-            {"id": "anydesk", "nombre": "AnyDesk", "desc": "Control remoto", "icono": "anydesk"},
             {"id": "chromium", "nombre": "Chromium", "desc": "Navegador web libre", "icono": "chromium-browser"},
+            {"id": "gnome-network-displays", "nombre": "Pantallas Inalámbricas", "desc": "Conectar a proyectores Wifi", "icono": "preferences-desktop-display"},
         ]
     }
 ]
@@ -63,9 +67,19 @@ def es_administrador():
         if os.geteuid() == 0: return True
         gid_list = os.getgroups()
         for gid in gid_list:
-            if grp.getgrgid(gid).gr_name == 'sudo': return True
+            nombre = grp.getgrgid(gid).gr_name
+            if nombre == 'sudo' or nombre == 'admin': return True
         return False
     except: return False
+
+def hay_bloqueo_apt():
+    """Comprueba si apt/dpkg están siendo usados por otro proceso."""
+    locks = ["/var/lib/dpkg/lock-frontend", "/var/lib/dpkg/lock"]
+    for lock in locks:
+        # Fuser devuelve 0 si el archivo está en uso
+        if subprocess.run(["fuser", lock], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode == 0:
+            return True
+    return False
 
 # ==============================================================================
 # LÓGICA DE AUTO-ACTUALIZACIÓN
@@ -101,23 +115,34 @@ class FilaApp(Gtk.ListBoxRow):
         box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
         box.set_border_width(10)
         
+        # Icono
         icon = Gtk.Image()
         icon.set_pixel_size(48)
-        if Gtk.IconTheme.get_default().has_icon(app_data["icono"]):
-            icon.set_from_icon_name(app_data["icono"], Gtk.IconSize.DIALOG)
+        
+        # Lógica de iconos robusta
+        icono_nombre = app_data["icono"]
+        if os.path.isabs(icono_nombre) and os.path.exists(icono_nombre):
+             icon.set_from_file(icono_nombre)
+        elif Gtk.IconTheme.get_default().has_icon(icono_nombre):
+            icon.set_from_icon_name(icono_nombre, Gtk.IconSize.DIALOG)
         else:
             icon.set_from_icon_name("system-software-install", Gtk.IconSize.DIALOG)
+            
         box.pack_start(icon, False, False, 0)
 
+        # Texto
         vbox_text = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
         lbl_name = Gtk.Label(xalign=0)
         lbl_name.set_markup(f"<b>{app_data['nombre']}</b>")
         lbl_desc = Gtk.Label(label=app_data['desc'], xalign=0)
         lbl_desc.get_style_context().add_class("dim-label")
+        lbl_desc.set_max_width_chars(40)
+        lbl_desc.set_line_wrap(True)
         vbox_text.pack_start(lbl_name, True, True, 0)
         vbox_text.pack_start(lbl_desc, True, True, 0)
         box.pack_start(vbox_text, True, True, 0)
 
+        # Controles
         self.switch = Gtk.Switch()
         self.switch.set_valign(Gtk.Align.CENTER)
         self.switch.connect("state-set", self.on_switch_activated)
@@ -140,15 +165,37 @@ class FilaApp(Gtk.ListBoxRow):
         return False
 
     def on_switch_activated(self, switch, state):
+        # Bloquear UI
         self.switch.set_sensitive(False)
         self.spinner.start()
+        
+        # Comprobar bloqueo de APT antes de pedir contraseña
+        if hay_bloqueo_apt():
+            self.mostrar_error("El sistema de actualizaciones está ocupado.\nEspere a que termine el icono de la barra.")
+            self.spinner.stop()
+            self.switch.set_sensitive(True)
+            return True # Cancelar cambio visual
+
         action = "install" if state else "remove"
         threading.Thread(target=self.run_apt_action, args=(action,)).start()
         return True
 
+    def mostrar_error(self, mensaje):
+        dialog = Gtk.MessageDialog(
+            parent=self.ventana_padre,
+            flags=Gtk.DialogFlags.MODAL,
+            message_type=Gtk.MessageType.ERROR,
+            buttons=Gtk.ButtonsType.OK,
+            text="Error"
+        )
+        dialog.format_secondary_text(mensaje)
+        dialog.run()
+        dialog.destroy()
+
     def run_apt_action(self, action):
-        """Ejecuta la instalación/desinstalación de forma robusta."""
-        print(f">>> Acción solicitada: {action} {self.pkg_name}")
+        print(f">>> Acción: {action} {self.pkg_name}")
+        error_msg = ""
+        success = False
         
         # 1. SCRIPT PERSONALIZADO
         if action == "install" and "script_install" in self.app_data:
@@ -157,19 +204,22 @@ class FilaApp(Gtk.ListBoxRow):
             
             if os.path.exists(ruta_script):
                 os.chmod(ruta_script, 0o755)
-                # pkexec env ... para pasar entorno si fuera necesario, aunque scripts bash suelen ir bien
+                # pkexec pide la contraseña
                 cmd = ["pkexec", "/bin/bash", ruta_script]
+                try:
+                    res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+                    if res.returncode == 0:
+                        success = True
+                    else:
+                        error_msg = f"Error del script:\n{res.stderr}"
+                except Exception as e:
+                    error_msg = f"Excepción script: {e}"
             else:
-                print(f"Error: Script {ruta_script} no encontrado.")
-                GLib.idle_add(self.finish_action, False, True)
-                return
+                error_msg = f"No se encuentra el script:\n{nombre_script}\n(¿Está subido a GitHub en la carpeta scripts?)"
         
-        # 2. MODO APT-GET ESTÁNDAR (Mejorado)
+        # 2. MODO APT-GET ESTÁNDAR
         else:
-            # Construimos el comando pkexec blindado:
-            # - env DEBIAN_FRONTEND=noninteractive: Para que apt no pregunte
-            # - /usr/bin/apt-get: Ruta absoluta
-            # - Opciones Dpkg: Para forzar configuraciones por defecto
+            # Comando blindado
             cmd = [
                 "pkexec", 
                 "env", "DEBIAN_FRONTEND=noninteractive",
@@ -181,33 +231,39 @@ class FilaApp(Gtk.ListBoxRow):
                 self.pkg_name
             ]
 
-        try:
-            # Ejecutamos y capturamos errores
-            res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-            
-            if res.returncode == 0:
-                print(f">>> Éxito: {action} {self.pkg_name}")
-                success = True
-            else:
-                print(f"!!! Error en {action}: {res.stderr}")
-                # Si falla por el LOCK, avisamos diferente? (difícil desde aquí sin complicar)
-                success = False
-        except Exception as e:
-            print(f"!!! Excepción python: {e}")
-            success = False
+            try:
+                res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+                if res.returncode == 0:
+                    success = True
+                else:
+                    # Analizar error común
+                    if "Unable to locate package" in res.stderr:
+                        error_msg = f"No se encuentra el paquete '{self.pkg_name}' en los repositorios."
+                    elif "Could not get lock" in res.stderr:
+                        error_msg = "El sistema de actualizaciones está ocupado. Inténtelo de nuevo."
+                    else:
+                        error_msg = f"Error de APT:\n{res.stderr}"
+            except Exception as e:
+                error_msg = f"Excepción interna: {e}"
 
-        GLib.idle_add(self.finish_action, success, action == "install")
+        GLib.idle_add(self.finish_action, success, action == "install", error_msg)
 
-    def finish_action(self, success, intended_state):
+    def finish_action(self, success, intended_state, error_msg=""):
         self.spinner.stop()
         self.switch.set_sensitive(True)
+        
         if success:
             self.switch.set_state(intended_state)
             subprocess.Popen(['notify-send', '-i', 'system-software-update', 'GuadaMint Store', f'Operación completada: {self.app_data["nombre"]}'])
             threading.Thread(target=self.check_installed).start()
         else:
+            # Revertir interruptor
             self.switch.set_state(not intended_state)
-            subprocess.Popen(['notify-send', '-u', 'critical', 'Error', f'No se pudo modificar {self.app_data["nombre"]}. ¿Hay otra actualización en curso?'])
+            # Mostrar ventana de error explicativa
+            if error_msg:
+                self.mostrar_error(error_msg)
+            else:
+                self.mostrar_error("La operación falló o fue cancelada.")
         return False
 
 class GuadaStoreWindow(Gtk.Window):
@@ -215,7 +271,9 @@ class GuadaStoreWindow(Gtk.Window):
         super().__init__(title=TITULO_APP)
         self.set_default_size(600, 700)
         self.set_border_width(0)
-        if os.path.exists(ICONO_APP): self.set_icon_from_file(ICONO_APP)
+        
+        if os.path.exists(ICONO_APP):
+            self.set_icon_from_file(ICONO_APP)
 
         header = Gtk.HeaderBar()
         header.set_show_close_button(True)
