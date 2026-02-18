@@ -7,7 +7,7 @@ import os
 import sys
 import threading
 import shutil
-import grp # Necesario para comprobar grupos
+import grp
 
 # ==============================================================================
 # CONFIGURACIÓN VISUAL
@@ -16,7 +16,6 @@ ICONO_APP = "/usr/share/icons/guadamintuz.svg"
 TITULO_APP = "Centro de Software GuadaMint"
 
 # --- CATÁLOGO DE APLICACIONES ---
-# Edita esta lista en GitHub y al reiniciar los PCs se actualizará
 CATALOGO = [
     {
         "categoria": "Educación",
@@ -53,6 +52,7 @@ REPO_URL = "https://github.com/aosucas499/guadamint.git"
 REPO_BRANCH = "main"
 SCRIPT_SRC = os.path.join(REPO_DIR, "src/apps-guadamint.py")
 SCRIPT_BIN = "/usr/bin/apps-guadamint.py"
+RUTA_SCRIPTS_REPO = "/opt/guadamint/scripts"
 
 # ==============================================================================
 # SEGURIDAD Y PERMISOS
@@ -60,30 +60,18 @@ SCRIPT_BIN = "/usr/bin/apps-guadamint.py"
 def es_administrador():
     """Comprueba si el usuario actual pertenece al grupo sudo o es root."""
     try:
-        # Si es root, todo ok
-        if os.geteuid() == 0:
-            return True
-        
-        # Obtenemos los grupos a los que pertenece el usuario actual
+        if os.geteuid() == 0: return True
         gid_list = os.getgroups()
         for gid in gid_list:
-            nombre_grupo = grp.getgrgid(gid).gr_name
-            if nombre_grupo == 'sudo':
-                return True
+            if grp.getgrgid(gid).gr_name == 'sudo': return True
         return False
-    except Exception:
-        return False
+    except: return False
 
 # ==============================================================================
 # LÓGICA DE AUTO-ACTUALIZACIÓN
 # ==============================================================================
 def auto_update():
-    """Comprueba si hay una versión nueva de ESTE script en el repo y se actualiza."""
-    # Solo intentamos actualizar si somos admin (para evitar errores de permisos) o si el script maestro falló
-    if not os.access(SCRIPT_BIN, os.W_OK):
-        return
-
-    print("--- Buscando actualizaciones de la tienda... ---")
+    if not os.access(SCRIPT_BIN, os.W_OK): return
     try:
         if not os.path.exists(REPO_DIR):
             subprocess.run(["git", "clone", "-b", REPO_BRANCH, REPO_URL, REPO_DIR], check=True)
@@ -92,17 +80,13 @@ def auto_update():
             subprocess.run(["git", "fetch", "origin"], check=True, stderr=subprocess.DEVNULL)
             subprocess.run(["git", "reset", "--hard", f"origin/{REPO_BRANCH}"], check=True, stderr=subprocess.DEVNULL)
         
-        if os.path.exists(SCRIPT_SRC):
-            if os.path.realpath(__file__) != os.path.realpath(SCRIPT_SRC):
-                with open(SCRIPT_SRC, 'rb') as f1, open(SCRIPT_BIN, 'rb') as f2:
-                    if f1.read() != f2.read():
-                        print(">>> ¡Nueva versión detectada! Actualizando...")
-                        shutil.copy2(SCRIPT_SRC, SCRIPT_BIN)
-                        os.chmod(SCRIPT_BIN, 0o755)
-                        print(">>> Reiniciando aplicación...")
-                        os.execv(sys.executable, ['python3'] + sys.argv)
-    except Exception as e:
-        print(f"Error en auto-update: {e}")
+        if os.path.exists(SCRIPT_SRC) and os.path.realpath(__file__) != os.path.realpath(SCRIPT_SRC):
+            with open(SCRIPT_SRC, 'rb') as f1, open(SCRIPT_BIN, 'rb') as f2:
+                if f1.read() != f2.read():
+                    shutil.copy2(SCRIPT_SRC, SCRIPT_BIN)
+                    os.chmod(SCRIPT_BIN, 0o755)
+                    os.execv(sys.executable, ['python3'] + sys.argv)
+    except: pass
 
 # ==============================================================================
 # INTERFAZ GRÁFICA (GTK)
@@ -163,11 +147,55 @@ class FilaApp(Gtk.ListBoxRow):
         return True
 
     def run_apt_action(self, action):
-        cmd = ["pkexec", "apt-get", action, "-y", self.pkg_name]
+        """Ejecuta la instalación/desinstalación de forma robusta."""
+        print(f">>> Acción solicitada: {action} {self.pkg_name}")
+        
+        # 1. SCRIPT PERSONALIZADO
+        if action == "install" and "script_install" in self.app_data:
+            nombre_script = self.app_data["script_install"]
+            ruta_script = os.path.join(RUTA_SCRIPTS_REPO, nombre_script)
+            
+            if os.path.exists(ruta_script):
+                os.chmod(ruta_script, 0o755)
+                # pkexec env ... para pasar entorno si fuera necesario, aunque scripts bash suelen ir bien
+                cmd = ["pkexec", "/bin/bash", ruta_script]
+            else:
+                print(f"Error: Script {ruta_script} no encontrado.")
+                GLib.idle_add(self.finish_action, False, True)
+                return
+        
+        # 2. MODO APT-GET ESTÁNDAR (Mejorado)
+        else:
+            # Construimos el comando pkexec blindado:
+            # - env DEBIAN_FRONTEND=noninteractive: Para que apt no pregunte
+            # - /usr/bin/apt-get: Ruta absoluta
+            # - Opciones Dpkg: Para forzar configuraciones por defecto
+            cmd = [
+                "pkexec", 
+                "env", "DEBIAN_FRONTEND=noninteractive",
+                "/usr/bin/apt-get", 
+                action, 
+                "-y", 
+                "-o", "Dpkg::Options::=--force-confdef",
+                "-o", "Dpkg::Options::=--force-confold",
+                self.pkg_name
+            ]
+
         try:
-            res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-            success = (res.returncode == 0)
-        except: success = False
+            # Ejecutamos y capturamos errores
+            res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+            
+            if res.returncode == 0:
+                print(f">>> Éxito: {action} {self.pkg_name}")
+                success = True
+            else:
+                print(f"!!! Error en {action}: {res.stderr}")
+                # Si falla por el LOCK, avisamos diferente? (difícil desde aquí sin complicar)
+                success = False
+        except Exception as e:
+            print(f"!!! Excepción python: {e}")
+            success = False
+
         GLib.idle_add(self.finish_action, success, action == "install")
 
     def finish_action(self, success, intended_state):
@@ -176,9 +204,10 @@ class FilaApp(Gtk.ListBoxRow):
         if success:
             self.switch.set_state(intended_state)
             subprocess.Popen(['notify-send', '-i', 'system-software-update', 'GuadaMint Store', f'Operación completada: {self.app_data["nombre"]}'])
+            threading.Thread(target=self.check_installed).start()
         else:
             self.switch.set_state(not intended_state)
-            subprocess.Popen(['notify-send', '-u', 'critical', 'Error', f'No se pudo modificar {self.app_data["nombre"]}'])
+            subprocess.Popen(['notify-send', '-u', 'critical', 'Error', f'No se pudo modificar {self.app_data["nombre"]}. ¿Hay otra actualización en curso?'])
         return False
 
 class GuadaStoreWindow(Gtk.Window):
@@ -232,31 +261,18 @@ class GuadaStoreWindow(Gtk.Window):
             threading.Thread(target=row.check_installed).start()
 
 def main():
-    # 1. VERIFICACIÓN DE PERMISOS
     if not es_administrador():
-        dialog = Gtk.MessageDialog(
-            parent=None,
-            flags=Gtk.DialogFlags.MODAL,
-            message_type=Gtk.MessageType.ERROR,
-            buttons=Gtk.ButtonsType.OK,
-            text="Acceso Restringido"
-        )
+        dialog = Gtk.MessageDialog(parent=None, flags=Gtk.DialogFlags.MODAL, message_type=Gtk.MessageType.ERROR, buttons=Gtk.ButtonsType.OK, text="Acceso Restringido")
         dialog.format_secondary_text("Esta aplicación es solo para administradores.\n\nContacte con su administrador/a TDE para instalar aplicaciones.")
         dialog.set_title("GuadaMint Store")
-        
-        if os.path.exists(ICONO_APP):
-            dialog.set_icon_from_file(ICONO_APP)
-            
+        if os.path.exists(ICONO_APP): dialog.set_icon_from_file(ICONO_APP)
         dialog.run()
         dialog.destroy()
         sys.exit(0)
 
-    # 2. Intentar auto-actualizarse al inicio
-    try:
-        auto_update()
-    except: pass # Si falla, arrancamos igual
+    try: auto_update()
+    except: pass
 
-    # 3. Iniciar Interfaz
     win = GuadaStoreWindow()
     win.connect("destroy", Gtk.main_quit)
     win.show_all()
