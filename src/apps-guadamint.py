@@ -16,36 +16,36 @@ import time
 ICONO_APP = "/usr/share/icons/guadamintuz.svg"
 TITULO_APP = "Centro de Software GuadaMint"
 
-# --- CATÁLOGO DE APLICACIONES ---
-# Nota: He quitado 'anydesk' porque no está en los repositorios oficiales y da error.
-# Solo dejamos paquetes que seguro existen en Linux Mint / Ubuntu.
+# --- CATÁLOGO DE APLICACIONES OPCIONALES ---
+# Hemos quitado las que ya instala el sistema automáticamente (Scratch, Audacity, etc.)
+# para evitar conflictos de bloqueo de APT.
 CATALOGO = [
     {
-        "categoria": "Educación",
+        "categoria": "Educación Extra",
         "apps": [
-            {"id": "geogebra", "nombre": "GeoGebra", "desc": "Matemáticas dinámicas", "icono": "geogebra"},
-            {"id": "stellarium", "nombre": "Stellarium", "desc": "Planetario virtual", "icono": "stellarium"},
-            {"id": "scratch", "nombre": "Scratch", "desc": "Aprender a programar", "icono": "scratch"},
-            {"id": "gcompris-qt", "nombre": "GCompris", "desc": "Suite educativa infantil", "icono": "gcompris-qt"},
-            {"id": "klavaro", "nombre": "Klavaro", "desc": "Tutor de mecanografía", "icono": "klavaro"},
-            {"id": "tuxpaint", "nombre": "Tux Paint", "desc": "Dibujo para niños", "icono": "tuxpaint"},
+            {"id": "geogebra", "nombre": "GeoGebra", "desc": "Matemáticas dinámicas complejas", "icono": "geogebra"},
+            {"id": "fritzing", "nombre": "Fritzing", "desc": "Diseño de circuitos electrónicos", "icono": "fritzing"},
+            {"id": "arduino", "nombre": "Arduino IDE", "desc": "Programación de placas Arduino", "icono": "arduino"},
+            {"id": "celestia", "nombre": "Celestia", "desc": "Simulador espacial 3D", "icono": "celestia"},
         ]
     },
     {
-        "categoria": "Creatividad",
+        "categoria": "Creatividad Avanzada",
         "apps": [
-            {"id": "blender", "nombre": "Blender", "desc": "Modelado y animación 3D", "icono": "blender"},
-            {"id": "inkscape", "nombre": "Inkscape", "desc": "Editor de gráficos vectoriales", "icono": "inkscape"},
-            {"id": "audacity", "nombre": "Audacity", "desc": "Editor de audio", "icono": "audacity"},
-            {"id": "obs-studio", "nombre": "OBS Studio", "desc": "Grabación y streaming", "icono": "obs"},
+            {"id": "blender", "nombre": "Blender", "desc": "Modelado y animación 3D profesional", "icono": "blender"},
+            {"id": "inkscape", "nombre": "Inkscape", "desc": "Diseño vectorial (Illustrator libre)", "icono": "inkscape"},
+            {"id": "kdenlive", "nombre": "Kdenlive", "desc": "Editor de vídeo profesional", "icono": "kdenlive"},
+            {"id": "obs-studio", "nombre": "OBS Studio", "desc": "Grabación y streaming de pantalla", "icono": "obs"},
+            {"id": "lmms", "nombre": "LMMS", "desc": "Producción musical (DAW)", "icono": "lmms"},
         ]
     },
     {
-        "categoria": "Utilidades",
+        "categoria": "Utilidades y Navegadores",
         "apps": [
-            {"id": "vlc", "nombre": "VLC", "desc": "Reproductor multimedia", "icono": "vlc"},
-            {"id": "chromium", "nombre": "Chromium", "desc": "Navegador web libre", "icono": "chromium-browser"},
-            {"id": "gnome-network-displays", "nombre": "Pantallas Inalámbricas", "desc": "Conectar a proyectores Wifi", "icono": "preferences-desktop-display"},
+            {"id": "vlc", "nombre": "VLC", "desc": "El reproductor que lo abre todo", "icono": "vlc"},
+            {"id": "chromium-browser", "nombre": "Chromium", "desc": "Navegador web libre (Base Chrome)", "icono": "chromium-browser"},
+            {"id": "gnome-boxes", "nombre": "Cajas (Boxes)", "desc": "Máquinas virtuales sencillas", "icono": "gnome-boxes"},
+            {"id": "filezilla", "nombre": "FileZilla", "desc": "Cliente FTP", "icono": "filezilla"},
         ]
     }
 ]
@@ -119,7 +119,6 @@ class FilaApp(Gtk.ListBoxRow):
         icon = Gtk.Image()
         icon.set_pixel_size(48)
         
-        # Lógica de iconos robusta
         icono_nombre = app_data["icono"]
         if os.path.isabs(icono_nombre) and os.path.exists(icono_nombre):
              icon.set_from_file(icono_nombre)
@@ -171,10 +170,12 @@ class FilaApp(Gtk.ListBoxRow):
         
         # Comprobar bloqueo de APT antes de pedir contraseña
         if hay_bloqueo_apt():
-            self.mostrar_error("El sistema de actualizaciones está ocupado.\nEspere a que termine el icono de la barra.")
+            self.mostrar_error("El sistema de actualizaciones está ocupado.\n\nEspere unos minutos a que termine el icono de la barra de tareas e inténtelo de nuevo.")
             self.spinner.stop()
             self.switch.set_sensitive(True)
-            return True # Cancelar cambio visual
+            # Revertimos visualmente el switch porque no se pudo hacer
+            switch.set_state(not state)
+            return True 
 
         action = "install" if state else "remove"
         threading.Thread(target=self.run_apt_action, args=(action,)).start()
@@ -186,7 +187,7 @@ class FilaApp(Gtk.ListBoxRow):
             flags=Gtk.DialogFlags.MODAL,
             message_type=Gtk.MessageType.ERROR,
             buttons=Gtk.ButtonsType.OK,
-            text="Error"
+            text="Aviso de Sistema"
         )
         dialog.format_secondary_text(mensaje)
         dialog.run()
@@ -204,7 +205,6 @@ class FilaApp(Gtk.ListBoxRow):
             
             if os.path.exists(ruta_script):
                 os.chmod(ruta_script, 0o755)
-                # pkexec pide la contraseña
                 cmd = ["pkexec", "/bin/bash", ruta_script]
                 try:
                     res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
@@ -215,11 +215,10 @@ class FilaApp(Gtk.ListBoxRow):
                 except Exception as e:
                     error_msg = f"Excepción script: {e}"
             else:
-                error_msg = f"No se encuentra el script:\n{nombre_script}\n(¿Está subido a GitHub en la carpeta scripts?)"
+                error_msg = f"Script no encontrado: {nombre_script}"
         
         # 2. MODO APT-GET ESTÁNDAR
         else:
-            # Comando blindado
             cmd = [
                 "pkexec", 
                 "env", "DEBIAN_FRONTEND=noninteractive",
@@ -236,11 +235,10 @@ class FilaApp(Gtk.ListBoxRow):
                 if res.returncode == 0:
                     success = True
                 else:
-                    # Analizar error común
                     if "Unable to locate package" in res.stderr:
                         error_msg = f"No se encuentra el paquete '{self.pkg_name}' en los repositorios."
                     elif "Could not get lock" in res.stderr:
-                        error_msg = "El sistema de actualizaciones está ocupado. Inténtelo de nuevo."
+                        error_msg = "Bloqueo de APT detectado. Cierre otros gestores de paquetes."
                     else:
                         error_msg = f"Error de APT:\n{res.stderr}"
             except Exception as e:
@@ -257,13 +255,11 @@ class FilaApp(Gtk.ListBoxRow):
             subprocess.Popen(['notify-send', '-i', 'system-software-update', 'GuadaMint Store', f'Operación completada: {self.app_data["nombre"]}'])
             threading.Thread(target=self.check_installed).start()
         else:
-            # Revertir interruptor
             self.switch.set_state(not intended_state)
-            # Mostrar ventana de error explicativa
             if error_msg:
                 self.mostrar_error(error_msg)
             else:
-                self.mostrar_error("La operación falló o fue cancelada.")
+                self.mostrar_error("Operación cancelada o fallida.")
         return False
 
 class GuadaStoreWindow(Gtk.Window):
