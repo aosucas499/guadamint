@@ -17,62 +17,41 @@ ICONO_APP = "/usr/share/icons/guadamintuz.svg"
 TITULO_APP = "Centro de Software GuadaMint"
 
 # --- CATÁLOGO DE APLICACIONES ---
-# Organización completa por niveles educativos y temáticas
 CATALOGO = [
     {
-        "categoria": "Educación Infantil y Primaria",
-        "apps": [
-            {"id": "gcompris-qt", "nombre": "GCompris", "desc": "Suite educativa completa (2-10 años)", "icono": "gcompris-qt"},
-            {"id": "tuxtype", "nombre": "Tux Typing", "desc": "Aprender mecanografía jugando", "icono": "tuxtype"},
-            {"id": "tuxmath", "nombre": "Tux Math", "desc": "Juego de matemáticas arcade", "icono": "tuxmath"},
-            {"id": "tuxpaint", "nombre": "Tux Paint", "desc": "Programa de dibujo para niños", "icono": "tuxpaint"},
-            {"id": "kanagram", "nombre": "Kanagram", "desc": "Juego de anagramas y vocabulario", "icono": "kanagram"},
-            {"id": "khangman", "nombre": "KHangMan", "desc": "Juego del ahorcado educativo", "icono": "khangman"},
-        ]
-    },
-    {
-        "categoria": "Educación Secundaria y Bachillerato",
+        "categoria": "Educación Extra",
         "apps": [
             {"id": "geogebra", "nombre": "GeoGebra", "desc": "Matemáticas dinámicas complejas", "icono": "geogebra"},
-            {"id": "stellarium", "nombre": "Stellarium", "desc": "Planetario virtual realista", "icono": "stellarium"},
-            {"id": "kalzium", "nombre": "Kalzium", "desc": "Tabla periódica y química", "icono": "kalzium"},
-            {"id": "step", "nombre": "Step", "desc": "Simulador físico interactivo", "icono": "step"},
-            {"id": "marble", "nombre": "Marble", "desc": "Globo terráqueo virtual", "icono": "marble"},
-            {"id": "kgeography", "nombre": "KGeography", "desc": "Aprender geografía mundial", "icono": "kgeography"},
-            {"id": "kwordquiz", "nombre": "KWordQuiz", "desc": "Tarjetas para aprender vocabulario", "icono": "kwordquiz"},
+            {"id": "fritzing", "nombre": "Fritzing", "desc": "Diseño de circuitos electrónicos", "icono": "fritzing"},
+            {"id": "arduino", "nombre": "Arduino IDE", "desc": "Programación de placas Arduino", "icono": "arduino"},
             {"id": "celestia", "nombre": "Celestia", "desc": "Simulador espacial 3D", "icono": "celestia"},
         ]
     },
     {
-        "categoria": "Programación y Robótica",
+        "categoria": "Creatividad Avanzada",
         "apps": [
-            {"id": "scratch", "nombre": "Scratch", "desc": "Aprender a programar visualmente", "icono": "scratch"},
-            {"id": "kturtle", "nombre": "KTurtle", "desc": "Programación educativa (Logo)", "icono": "kturtle"},
-            {"id": "thonny", "nombre": "Thonny", "desc": "IDE de Python para principiantes", "icono": "thonny"},
-            {"id": "minetest", "nombre": "Minetest", "desc": "Mundo abierto (Versión libre de Minecraft)", "icono": "minetest"},
-            {"id": "fritzing", "nombre": "Fritzing", "desc": "Diseño de circuitos electrónicos", "icono": "fritzing"},
-            {"id": "arduino", "nombre": "Arduino IDE", "desc": "Programación de placas Arduino", "icono": "arduino"},
-        ]
-    },
-    {
-        "categoria": "Creatividad y Multimedia",
-        "apps": [
-            {"id": "audacity", "nombre": "Audacity", "desc": "Editor de audio y grabación", "icono": "audacity"},
-            {"id": "inkscape", "nombre": "Inkscape", "desc": "Diseño vectorial (Illustrator libre)", "icono": "inkscape"},
             {"id": "blender", "nombre": "Blender", "desc": "Modelado y animación 3D profesional", "icono": "blender"},
+            {"id": "inkscape", "nombre": "Inkscape", "desc": "Diseño vectorial (Illustrator libre)", "icono": "inkscape"},
             {"id": "kdenlive", "nombre": "Kdenlive", "desc": "Editor de vídeo profesional", "icono": "kdenlive"},
             {"id": "obs-studio", "nombre": "OBS Studio", "desc": "Grabación y streaming de pantalla", "icono": "obs"},
             {"id": "lmms", "nombre": "LMMS", "desc": "Producción musical (DAW)", "icono": "lmms"},
         ]
     },
     {
-        "categoria": "Utilidades del Sistema",
+        "categoria": "Utilidades y Navegadores",
         "apps": [
-            {"id": "klavaro", "nombre": "Klavaro", "desc": "Curso de mecanografía serio", "icono": "klavaro"},
-            {"id": "gnome-network-displays", "nombre": "Pantallas Inalámbricas", "desc": "Conectar a proyectores Wifi", "icono": "preferences-desktop-display"},
-            {"id": "vlc", "nombre": "VLC", "desc": "Reproductor multimedia universal", "icono": "vlc"},
+            {"id": "vlc", "nombre": "VLC", "desc": "El reproductor que lo abre todo", "icono": "vlc"},
             {"id": "chromium-browser", "nombre": "Chromium", "desc": "Navegador web libre (Base Chrome)", "icono": "chromium-browser"},
-            {"id": "gbrainy", "nombre": "GBrainy", "desc": "Juegos de lógica y memoria", "icono": "gbrainy"},
+            # --- AQUI ESTÁ EL SCRIPT DE CHROME ---
+            {
+                "id": "google-chrome-stable",           # Nombre del paquete para comprobar si está instalado
+                "nombre": "Google Chrome",              # Nombre visual
+                "desc": "Navegador oficial de Google",  # Descripción
+                "icono": "google-chrome",               # Icono
+                "script_install": "instalar_chrome.sh"  # EL SCRIPT QUE SE EJECUTARÁ
+            },
+            # -------------------------------------
+            {"id": "gnome-boxes", "nombre": "Cajas (Boxes)", "desc": "Máquinas virtuales sencillas", "icono": "gnome-boxes"},
             {"id": "filezilla", "nombre": "FileZilla", "desc": "Cliente FTP", "icono": "filezilla"},
         ]
     }
@@ -84,7 +63,9 @@ REPO_URL = "https://github.com/aosucas499/guadamint.git"
 REPO_BRANCH = "main"
 SCRIPT_SRC = os.path.join(REPO_DIR, "src/apps-guadamint.py")
 SCRIPT_BIN = "/usr/bin/apps-guadamint.py"
-RUTA_SCRIPTS_REPO = "/opt/guadamint/scripts"
+
+# RUTA DONDE ESTÁN LOS SCRIPTS BASH
+RUTA_SCRIPTS_REPO = "/opt/guadamint/src/scripts"
 
 # ==============================================================================
 # SEGURIDAD Y PERMISOS (AUTO-ELEVACIÓN)
@@ -92,32 +73,23 @@ RUTA_SCRIPTS_REPO = "/opt/guadamint/scripts"
 def elevar_a_root():
     """Si no somos root, nos reiniciamos usando pkexec para pedir pass una vez."""
     if os.geteuid() != 0:
-        # Buscamos el usuario real para conservar su display
         usuario_real = os.environ.get('USER', 'usuario')
-        
-        # Preparamos el entorno para que la ventana gráfica se muestre siendo root
         env = os.environ.copy()
-        
-        # Intentamos recuperar la XAUTHORITY del usuario si no está definida
         if 'XAUTHORITY' not in env:
             possible_auth = f"/home/{usuario_real}/.Xauthority"
             if os.path.exists(possible_auth):
                 env['XAUTHORITY'] = possible_auth
         
-        # Comando para re-lanzarnos a nosotros mismos
         args = ['pkexec', 'env', f'DISPLAY={env.get("DISPLAY", ":0")}', 
                 f'XAUTHORITY={env.get("XAUTHORITY", "")}', 
                 sys.executable] + sys.argv
-        
         try:
-            # Reemplazamos el proceso actual con el nuevo elevado
             os.execvpe('pkexec', args, env)
         except Exception as e:
             print(f"Error al elevar privilegios: {e}")
             sys.exit(1)
 
 def hay_bloqueo_apt():
-    """Comprueba si apt/dpkg están siendo usados por otro proceso."""
     locks = ["/var/lib/dpkg/lock-frontend", "/var/lib/dpkg/lock"]
     for lock in locks:
         if subprocess.run(["fuser", lock], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode == 0:
@@ -128,7 +100,6 @@ def hay_bloqueo_apt():
 # LÓGICA DE AUTO-ACTUALIZACIÓN
 # ==============================================================================
 def auto_update():
-    # Como ya somos root, podemos escribir en /usr/bin sin problemas
     try:
         if not os.path.exists(REPO_DIR):
             subprocess.run(["git", "clone", "-b", REPO_BRANCH, REPO_URL, REPO_DIR], check=True)
@@ -158,7 +129,6 @@ class FilaApp(Gtk.ListBoxRow):
         box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
         box.set_border_width(10)
         
-        # Icono
         icon = Gtk.Image()
         icon.set_pixel_size(48)
         icono_nombre = app_data["icono"]
@@ -170,7 +140,6 @@ class FilaApp(Gtk.ListBoxRow):
             icon.set_from_icon_name("system-software-install", Gtk.IconSize.DIALOG)
         box.pack_start(icon, False, False, 0)
 
-        # Texto
         vbox_text = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
         lbl_name = Gtk.Label(xalign=0)
         lbl_name.set_markup(f"<b>{app_data['nombre']}</b>")
@@ -182,7 +151,6 @@ class FilaApp(Gtk.ListBoxRow):
         vbox_text.pack_start(lbl_desc, True, True, 0)
         box.pack_start(vbox_text, True, True, 0)
 
-        # Controles
         self.switch = Gtk.Switch()
         self.switch.set_valign(Gtk.Align.CENTER)
         self.handler_id = self.switch.connect("state-set", self.on_switch_activated)
@@ -196,13 +164,11 @@ class FilaApp(Gtk.ListBoxRow):
         threading.Thread(target=self.check_installed).start()
 
     def check_installed(self):
-        # Comprobamos estado real
         res = subprocess.run(["dpkg", "-s", self.pkg_name], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         is_installed = (res.returncode == 0)
         GLib.idle_add(self.update_switch_state, is_installed)
 
     def update_switch_state(self, state):
-        # Actualizamos sin disparar eventos
         self.switch.handler_block(self.handler_id)
         self.switch.set_active(state)
         self.switch.handler_unblock(self.handler_id)
@@ -216,7 +182,6 @@ class FilaApp(Gtk.ListBoxRow):
             self.mostrar_error("El sistema de actualizaciones está ocupado.\n\nEspere unos minutos.")
             self.spinner.stop()
             self.switch.set_sensitive(True)
-            # Revertir visualmente
             self.switch.handler_block(self.handler_id)
             self.switch.set_active(not state)
             self.switch.handler_unblock(self.handler_id)
@@ -227,13 +192,7 @@ class FilaApp(Gtk.ListBoxRow):
         return True
 
     def mostrar_error(self, mensaje):
-        dialog = Gtk.MessageDialog(
-            parent=self.ventana_padre,
-            flags=Gtk.DialogFlags.MODAL,
-            message_type=Gtk.MessageType.ERROR,
-            buttons=Gtk.ButtonsType.OK,
-            text="Aviso"
-        )
+        dialog = Gtk.MessageDialog(parent=self.ventana_padre, flags=Gtk.DialogFlags.MODAL, message_type=Gtk.MessageType.ERROR, buttons=Gtk.ButtonsType.OK, text="Aviso")
         dialog.format_secondary_text(mensaje)
         dialog.run()
         dialog.destroy()
@@ -243,14 +202,13 @@ class FilaApp(Gtk.ListBoxRow):
         error_msg = ""
         success = False
         
-        # 1. SCRIPT PERSONALIZADO
+        # 1. SCRIPT PERSONALIZADO (Solo para install)
         if action == "install" and "script_install" in self.app_data:
             nombre_script = self.app_data["script_install"]
             ruta_script = os.path.join(RUTA_SCRIPTS_REPO, nombre_script)
             
             if os.path.exists(ruta_script):
                 os.chmod(ruta_script, 0o755)
-                # Ejecutamos directo (ya somos root)
                 cmd = ["/bin/bash", ruta_script]
                 try:
                     res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
@@ -260,17 +218,9 @@ class FilaApp(Gtk.ListBoxRow):
             else:
                 error_msg = f"Script no encontrado: {nombre_script}"
         
-        # 2. MODO APT-GET ESTÁNDAR
+        # 2. MODO APT ESTÁNDAR
         else:
-            # Ejecutamos directo sin pkexec
-            cmd = [
-                "env", "DEBIAN_FRONTEND=noninteractive",
-                "/usr/bin/apt-get", 
-                action, "-y", 
-                "-o", "Dpkg::Options::=--force-confdef",
-                "-o", "Dpkg::Options::=--force-confold",
-                self.pkg_name
-            ]
+            cmd = ["env", "DEBIAN_FRONTEND=noninteractive", "/usr/bin/apt-get", action, "-y", "-o", "Dpkg::Options::=--force-confdef", "-o", "Dpkg::Options::=--force-confold", self.pkg_name]
             try:
                 res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
                 if res.returncode == 0: success = True
@@ -285,24 +235,15 @@ class FilaApp(Gtk.ListBoxRow):
     def finish_action(self, success, intended_state, error_msg=""):
         self.spinner.stop()
         self.switch.set_sensitive(True)
-        
         self.switch.handler_block(self.handler_id)
         if success:
-            # Forzamos el estado visual al que queríamos
             self.switch.set_active(intended_state)
-            
-            # Notificación al usuario real (no a root)
             user = os.environ.get('SUDO_USER', os.environ.get('USER'))
-            subprocess.Popen(['sudo', '-u', user, 'notify-send', 
-                            '-i', 'system-software-update', 
-                            'GuadaMint Store', 
-                            f'Operación completada: {self.app_data["nombre"]}'])
+            subprocess.Popen(['sudo', '-u', user, 'notify-send', '-i', 'system-software-update', 'GuadaMint Store', f'Operación completada: {self.app_data["nombre"]}'])
         else:
-            # Revertimos al estado contrario
             self.switch.set_active(not intended_state)
             if error_msg: self.mostrar_error(error_msg)
             else: self.mostrar_error("Operación fallida.")
-        
         self.switch.handler_unblock(self.handler_id)
         return False
 
@@ -357,14 +298,9 @@ class GuadaStoreWindow(Gtk.Window):
             threading.Thread(target=row.check_installed).start()
 
 def main():
-    # 1. AUTO-ELEVACIÓN A ROOT (Pide contraseña gráfica UNA VEZ)
     elevar_a_root()
-
-    # 2. Auto-Update (Ahora sí puede escribir en /usr/bin)
     try: auto_update()
     except: pass
-
-    # 3. Iniciar Interfaz
     win = GuadaStoreWindow()
     win.connect("destroy", Gtk.main_quit)
     win.show_all()
