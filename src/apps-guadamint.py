@@ -17,32 +17,62 @@ ICONO_APP = "/usr/share/icons/guadamintuz.svg"
 TITULO_APP = "Centro de Software GuadaMint"
 
 # --- CATÁLOGO DE APLICACIONES ---
+# Organización completa por niveles educativos y temáticas
 CATALOGO = [
     {
-        "categoria": "Educación Extra",
+        "categoria": "Educación Infantil y Primaria",
+        "apps": [
+            {"id": "gcompris-qt", "nombre": "GCompris", "desc": "Suite educativa completa (2-10 años)", "icono": "gcompris-qt"},
+            {"id": "tuxtype", "nombre": "Tux Typing", "desc": "Aprender mecanografía jugando", "icono": "tuxtype"},
+            {"id": "tuxmath", "nombre": "Tux Math", "desc": "Juego de matemáticas arcade", "icono": "tuxmath"},
+            {"id": "tuxpaint", "nombre": "Tux Paint", "desc": "Programa de dibujo para niños", "icono": "tuxpaint"},
+            {"id": "kanagram", "nombre": "Kanagram", "desc": "Juego de anagramas y vocabulario", "icono": "kanagram"},
+            {"id": "khangman", "nombre": "KHangMan", "desc": "Juego del ahorcado educativo", "icono": "khangman"},
+        ]
+    },
+    {
+        "categoria": "Educación Secundaria y Bachillerato",
         "apps": [
             {"id": "geogebra", "nombre": "GeoGebra", "desc": "Matemáticas dinámicas complejas", "icono": "geogebra"},
-            {"id": "fritzing", "nombre": "Fritzing", "desc": "Diseño de circuitos electrónicos", "icono": "fritzing"},
-            {"id": "arduino", "nombre": "Arduino IDE", "desc": "Programación de placas Arduino", "icono": "arduino"},
+            {"id": "stellarium", "nombre": "Stellarium", "desc": "Planetario virtual realista", "icono": "stellarium"},
+            {"id": "kalzium", "nombre": "Kalzium", "desc": "Tabla periódica y química", "icono": "kalzium"},
+            {"id": "step", "nombre": "Step", "desc": "Simulador físico interactivo", "icono": "step"},
+            {"id": "marble", "nombre": "Marble", "desc": "Globo terráqueo virtual", "icono": "marble"},
+            {"id": "kgeography", "nombre": "KGeography", "desc": "Aprender geografía mundial", "icono": "kgeography"},
+            {"id": "kwordquiz", "nombre": "KWordQuiz", "desc": "Tarjetas para aprender vocabulario", "icono": "kwordquiz"},
             {"id": "celestia", "nombre": "Celestia", "desc": "Simulador espacial 3D", "icono": "celestia"},
         ]
     },
     {
-        "categoria": "Creatividad Avanzada",
+        "categoria": "Programación y Robótica",
         "apps": [
-            {"id": "blender", "nombre": "Blender", "desc": "Modelado y animación 3D profesional", "icono": "blender"},
+            {"id": "scratch", "nombre": "Scratch", "desc": "Aprender a programar visualmente", "icono": "scratch"},
+            {"id": "kturtle", "nombre": "KTurtle", "desc": "Programación educativa (Logo)", "icono": "kturtle"},
+            {"id": "thonny", "nombre": "Thonny", "desc": "IDE de Python para principiantes", "icono": "thonny"},
+            {"id": "minetest", "nombre": "Minetest", "desc": "Mundo abierto (Versión libre de Minecraft)", "icono": "minetest"},
+            {"id": "fritzing", "nombre": "Fritzing", "desc": "Diseño de circuitos electrónicos", "icono": "fritzing"},
+            {"id": "arduino", "nombre": "Arduino IDE", "desc": "Programación de placas Arduino", "icono": "arduino"},
+        ]
+    },
+    {
+        "categoria": "Creatividad y Multimedia",
+        "apps": [
+            {"id": "audacity", "nombre": "Audacity", "desc": "Editor de audio y grabación", "icono": "audacity"},
             {"id": "inkscape", "nombre": "Inkscape", "desc": "Diseño vectorial (Illustrator libre)", "icono": "inkscape"},
+            {"id": "blender", "nombre": "Blender", "desc": "Modelado y animación 3D profesional", "icono": "blender"},
             {"id": "kdenlive", "nombre": "Kdenlive", "desc": "Editor de vídeo profesional", "icono": "kdenlive"},
             {"id": "obs-studio", "nombre": "OBS Studio", "desc": "Grabación y streaming de pantalla", "icono": "obs"},
             {"id": "lmms", "nombre": "LMMS", "desc": "Producción musical (DAW)", "icono": "lmms"},
         ]
     },
     {
-        "categoria": "Utilidades y Navegadores",
+        "categoria": "Utilidades del Sistema",
         "apps": [
-            {"id": "vlc", "nombre": "VLC", "desc": "El reproductor que lo abre todo", "icono": "vlc"},
+            {"id": "klavaro", "nombre": "Klavaro", "desc": "Curso de mecanografía serio", "icono": "klavaro"},
+            {"id": "gnome-network-displays", "nombre": "Pantallas Inalámbricas", "desc": "Conectar a proyectores Wifi", "icono": "preferences-desktop-display"},
+            {"id": "vlc", "nombre": "VLC", "desc": "Reproductor multimedia universal", "icono": "vlc"},
             {"id": "chromium-browser", "nombre": "Chromium", "desc": "Navegador web libre (Base Chrome)", "icono": "chromium-browser"},
-            {"id": "gnome-boxes", "nombre": "Cajas (Boxes)", "desc": "Máquinas virtuales sencillas", "icono": "gnome-boxes"},
+            {"id": "gbrainy", "nombre": "GBrainy", "desc": "Juegos de lógica y memoria", "icono": "gbrainy"},
             {"id": "filezilla", "nombre": "FileZilla", "desc": "Cliente FTP", "icono": "filezilla"},
         ]
     }
