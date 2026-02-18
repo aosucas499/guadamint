@@ -21,7 +21,6 @@ REPO_DIR = "/opt/guadamint"
 REPO_BRANCH = "main" 
 
 # --- ARCHIVOS QUE SE DEBEN ACTUALIZAR DESDE GITHUB ---
-# Mapeo: Dónde está en el repo -> Dónde va en el sistema
 ARCHIVOS_A_SINCRONIZAR = [
     {
         "origen": "src/guadamint-update.py", 
@@ -33,17 +32,13 @@ ARCHIVOS_A_SINCRONIZAR = [
     }
 ]
 
-# El script actual (para saber si nos hemos actualizado a nosotros mismos y reiniciar)
 SCRIPT_BIN_PATH = "/usr/bin/guadamint-update.py"
 
-# LISTA DE APPS OBLIGATORIAS (Mantenimiento)
+# LISTA DE APPS OBLIGATORIAS (SISTEMA BASE)
+# Solo dejamos lo esencial para el funcionamiento del aula
 APPS_OBLIGATORIAS = [
-    "zram-tools", "gnome-network-displays", 
-    "tuxtype", "tuxmath", "tuxpaint", 
-    "kgeography", "kwordquiz", "klettres", "khangman", "kanagram", 
-    "stellarium", "kalzium", "step", "gbrainy", "marble",
-    "scratch", "kturtle", "thonny", "minetest",
-    "gcompris-qt", "audacity", "openboard", "klavaro"
+    "zram-tools",  # Optimización de RAM
+    "openboard"    # Pizarra digital (básica en todas las aulas)
 ]
 
 logging.basicConfig(filename=LOG_FILE, level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -96,8 +91,7 @@ def auto_actualizar_desde_git():
         except Exception as e:
             log_y_print(f"!!! Error git: {e}")
 
-    # 2. Sincronizar archivos al sistema (Si hubo cambios en git o si faltan/son distintos)
-    # Recorremos la lista de archivos (actualizador y tienda)
+    # 2. Sincronizar archivos al sistema
     se_requiere_reinicio = False
     
     for item in ARCHIVOS_A_SINCRONIZAR:
@@ -106,8 +100,6 @@ def auto_actualizar_desde_git():
         
         try:
             if os.path.exists(ruta_origen):
-                # Comprobamos si hay que actualizar (si son distintos o destino no existe)
-                # O si hubo cambios en git, forzamos la copia por seguridad
                 if hay_cambios_git or not os.path.exists(ruta_destino) or \
                    not filecmp.cmp(ruta_origen, ruta_destino, shallow=False):
                     
@@ -115,7 +107,6 @@ def auto_actualizar_desde_git():
                     shutil.copy2(ruta_origen, ruta_destino)
                     os.chmod(ruta_destino, 0o755)
                     
-                    # Si hemos actualizado ESTE mismo script, necesitamos reiniciar
                     if ruta_destino == SCRIPT_BIN_PATH:
                         se_requiere_reinicio = True
             else:
@@ -136,7 +127,6 @@ def auto_actualizar_desde_git():
 # ==============================================================================
 # FUNCIONES DE INTERFAZ Y SISTEMA
 # ==============================================================================
-# ... (El resto de funciones se mantienen idénticas) ...
 
 def obtener_entorno_usuario(usuario):
     env_vars = {'DISPLAY': ':0'}
@@ -227,7 +217,7 @@ def verificar_e_instalar_apps():
     if faltantes:
         log_y_print(f">>> Faltan {len(faltantes)} apps.")
         actualizar_tray('trabajando', f"Instalando {len(faltantes)} apps...")
-        mostrar_aviso("Mantenimiento", f"Instalando apps faltantes:\n{', '.join(faltantes)}")
+        mostrar_aviso("Mantenimiento", f"Instalando apps base:\n{', '.join(faltantes)}")
         ejecutar_comando(['apt-get', 'update'], visible=True)
         if ejecutar_comando(['apt-get', 'install', '-y'] + faltantes, visible=True):
             actualizar_tray('ok', "Software actualizado")
@@ -243,7 +233,6 @@ def main():
     if os.geteuid() != 0: sys.exit(1)
     iniciar_tray_icon()
     try:
-        # 1. AUTO-UPDATE (Ahora incluye la tienda)
         auto_actualizar_desde_git()
         
         escritorio = detectar_escritorio()
