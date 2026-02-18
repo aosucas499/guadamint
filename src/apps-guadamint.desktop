@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=GuadaMint Store
+Name[es]=Tienda GuadaMint
+Comment=Instalar aplicaciones educativas
+Exec=/usr/bin/apps-guadamint.py
+Icon=/usr/share/icons/guadamintuz.svg
+Terminal=false
+Categories=System;Settings;PackageManager;
