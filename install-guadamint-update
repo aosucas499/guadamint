@@ -6,10 +6,10 @@ if [ "$EUID" -ne 0 ]; then
   exit 1
 fi
 
-echo ">>> Instalando sistema de actualizaciones GuadaMint..."
+echo ">>> Instalando sistema GuadaMint (Actualizador + Tienda)..."
 
 # 0. INSTALAR DEPENDENCIAS (GIT)
-# Vital para que funcione la auto-actualización del script Python
+# Vital para que funcione la auto-actualización de los scripts Python
 echo "Comprobando dependencias..."
 if ! command -v git &> /dev/null; then
     echo "-> Git no encontrado. Instalando..."
@@ -25,14 +25,19 @@ else
     echo "-> Git ya está instalado. Correcto."
 fi
 
-# 1. DEFINIR RUTAS
+# 1. DEFINIR RUTAS DE ORIGEN Y DESTINO
 SOURCE_DIR=$(dirname "$0")
-DEST_BIN="/usr/bin/guadamint-update.py"  
-DEST_DESKTOP="/etc/xdg/autostart/guadamint-update.desktop"
+
+# Destinos en el sistema
+DEST_BIN_UPDATE="/usr/bin/guadamint-update.py"  
+DEST_BIN_STORE="/usr/bin/apps-guadamint.py"
+DEST_AUTOSTART="/etc/xdg/autostart/guadamint-update.desktop"
+DEST_LAUNCHER_STORE="/usr/share/applications/apps-guadamint.desktop"
 DEST_ICON="/usr/share/icons/guadamintuz.svg"
 LOG_DIR="/var/log/guadamint"
 
 # FUNCIÓN DE BÚSQUEDA INTELIGENTE
+# Busca el archivo en la subcarpeta indicada (ej: src) O en la carpeta raíz del instalador
 buscar_archivo() {
     local archivo=$1
     local subcarpeta=$2
@@ -46,6 +51,7 @@ buscar_archivo() {
 }
 
 # 2. CONFIGURAR SUDOERS
+# Permite que el actualizador se ejecute sin pedir contraseña al alumno
 FILE_SUDOERS=$(buscar_archivo "zz-guadamint-update" "src")
 SUDOERS_DEST="/etc/sudoers.d/zz-guadamint-update"
 
@@ -59,33 +65,57 @@ else
     exit 1
 fi
 
-# 3. COPIAR EL SCRIPT PYTHON
-FILE_PYTHON=$(buscar_archivo "guadamint-update.py" "src")
+# 3. COPIAR EL SCRIPT ACTUALIZADOR (PYTHON)
+FILE_UPDATE=$(buscar_archivo "guadamint-update.py" "src")
 
-if [ -n "$FILE_PYTHON" ]; then
-    echo "Copiando script $FILE_PYTHON a $DEST_BIN..."
-    cp "$FILE_PYTHON" "$DEST_BIN"
-    chmod 755 "$DEST_BIN"
+if [ -n "$FILE_UPDATE" ]; then
+    echo "Copiando actualizador $FILE_UPDATE a $DEST_BIN_UPDATE..."
+    cp "$FILE_UPDATE" "$DEST_BIN_UPDATE"
+    chmod 755 "$DEST_BIN_UPDATE"
 else
     echo "¡ERROR CRÍTICO! No se encuentra 'guadamint-update.py'."
     exit 1
 fi
 
-# 4. COPIAR EL AUTOARRANQUE (.desktop)
-FILE_DESKTOP=$(buscar_archivo "guadamint-update.desktop" "src")
+# 4. COPIAR LA TIENDA DE APPS (PYTHON)
+FILE_STORE=$(buscar_archivo "apps-guadamint.py" "src")
 
-if [ -n "$FILE_DESKTOP" ]; then
-    echo "Copiando lanzador $FILE_DESKTOP a $DEST_DESKTOP..."
-    cp "$FILE_DESKTOP" "$DEST_DESKTOP"
-    chmod 644 "$DEST_DESKTOP"
+if [ -n "$FILE_STORE" ]; then
+    echo "Copiando tienda $FILE_STORE a $DEST_BIN_STORE..."
+    cp "$FILE_STORE" "$DEST_BIN_STORE"
+    chmod 755 "$DEST_BIN_STORE"
+else
+    echo "AVISO: No se encuentra 'apps-guadamint.py'. La tienda no se instalará."
+fi
+
+# 5. COPIAR EL AUTOARRANQUE (.desktop)
+# Esto hace que el actualizador arranque al iniciar sesión
+FILE_AUTOSTART=$(buscar_archivo "guadamint-update.desktop" "src")
+
+if [ -n "$FILE_AUTOSTART" ]; then
+    echo "Copiando autostart $FILE_AUTOSTART a $DEST_AUTOSTART..."
+    cp "$FILE_AUTOSTART" "$DEST_AUTOSTART"
+    chmod 644 "$DEST_AUTOSTART"
 else
     echo "¡ERROR CRÍTICO! No se encuentra 'guadamint-update.desktop'."
     exit 1
 fi
 
-# 5. INSTALAR ICONO
+# 6. COPIAR EL LANZADOR DE LA TIENDA (.desktop)
+# Esto pone la tienda en el menú de aplicaciones
+FILE_LAUNCHER=$(buscar_archivo "apps-guadamint.desktop" "src")
+
+if [ -n "$FILE_LAUNCHER" ]; then
+    echo "Copiando lanzador de menú $FILE_LAUNCHER a $DEST_LAUNCHER_STORE..."
+    cp "$FILE_LAUNCHER" "$DEST_LAUNCHER_STORE"
+    chmod 644 "$DEST_LAUNCHER_STORE"
+else
+    echo "AVISO: No se encuentra 'apps-guadamint.desktop'."
+fi
+
+# 7. INSTALAR ICONO
+# Buscamos guadamintuz.svg en images/ o raíz. Si no, probamos con el nombre antiguo.
 FILE_ICON=$(buscar_archivo "guadamintuz.svg" "images")
-# Fallback: buscar el nombre antiguo por si acaso
 if [ -z "$FILE_ICON" ]; then FILE_ICON=$(buscar_archivo "AndaTuz2.svg" "images"); fi
 
 echo "Instalando icono en $DEST_ICON..."
@@ -97,8 +127,10 @@ else
     echo "AVISO: No se encontró el icono (guadamintuz.svg). Se usará genérico."
 fi
 
-# 6. CREAR DIRECTORIO DE LOGS
+# 8. CREAR DIRECTORIO DE LOGS Y DAR PERMISOS
 mkdir -p "$LOG_DIR"
+# Damos permisos 777 para que el usuario pueda escribir logs si lo necesita,
+# aunque el script principal corre como root gracias a sudoers.
 chmod 777 "$LOG_DIR"
 
 echo ">>> Instalación completada con éxito."
