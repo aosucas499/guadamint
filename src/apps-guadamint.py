@@ -17,62 +17,33 @@ ICONO_APP = "/usr/share/icons/guadamintuz.svg"
 TITULO_APP = "Centro de Software GuadaMint"
 
 # --- CATÁLOGO DE APLICACIONES ---
-# Todas las apps educativas ahora son opcionales y se instalan desde aquí
 CATALOGO = [
     {
-        "categoria": "Educación Infantil y Primaria",
-        "apps": [
-            {"id": "gcompris-qt", "nombre": "GCompris", "desc": "Suite educativa completa (2-10 años)", "icono": "gcompris-qt"},
-            {"id": "tuxtype", "nombre": "Tux Typing", "desc": "Aprender mecanografía jugando", "icono": "tuxtype"},
-            {"id": "tuxmath", "nombre": "Tux Math", "desc": "Juego de matemáticas arcade", "icono": "tuxmath"},
-            {"id": "tuxpaint", "nombre": "Tux Paint", "desc": "Programa de dibujo para niños", "icono": "tuxpaint"},
-            {"id": "kanagram", "nombre": "Kanagram", "desc": "Juego de anagramas y vocabulario", "icono": "kanagram"},
-            {"id": "khangman", "nombre": "KHangMan", "desc": "Juego del ahorcado educativo", "icono": "khangman"},
-        ]
-    },
-    {
-        "categoria": "Educación Secundaria y Bachillerato",
+        "categoria": "Educación Extra",
         "apps": [
             {"id": "geogebra", "nombre": "GeoGebra", "desc": "Matemáticas dinámicas complejas", "icono": "geogebra"},
-            {"id": "stellarium", "nombre": "Stellarium", "desc": "Planetario virtual realista", "icono": "stellarium"},
-            {"id": "kalzium", "nombre": "Kalzium", "desc": "Tabla periódica y química", "icono": "kalzium"},
-            {"id": "step", "nombre": "Step", "desc": "Simulador físico interactivo", "icono": "step"},
-            {"id": "marble", "nombre": "Marble", "desc": "Globo terráqueo virtual", "icono": "marble"},
-            {"id": "kgeography", "nombre": "KGeography", "desc": "Aprender geografía mundial", "icono": "kgeography"},
-            {"id": "kwordquiz", "nombre": "KWordQuiz", "desc": "Tarjetas para aprender vocabulario", "icono": "kwordquiz"},
+            {"id": "fritzing", "nombre": "Fritzing", "desc": "Diseño de circuitos electrónicos", "icono": "fritzing"},
+            {"id": "arduino", "nombre": "Arduino IDE", "desc": "Programación de placas Arduino", "icono": "arduino"},
             {"id": "celestia", "nombre": "Celestia", "desc": "Simulador espacial 3D", "icono": "celestia"},
         ]
     },
     {
-        "categoria": "Programación y Robótica",
+        "categoria": "Creatividad Avanzada",
         "apps": [
-            {"id": "scratch", "nombre": "Scratch", "desc": "Aprender a programar visualmente", "icono": "scratch"},
-            {"id": "kturtle", "nombre": "KTurtle", "desc": "Programación educativa (Logo)", "icono": "kturtle"},
-            {"id": "thonny", "nombre": "Thonny", "desc": "IDE de Python para principiantes", "icono": "thonny"},
-            {"id": "minetest", "nombre": "Minetest", "desc": "Mundo abierto (Versión libre de Minecraft)", "icono": "minetest"},
-            {"id": "fritzing", "nombre": "Fritzing", "desc": "Diseño de circuitos electrónicos", "icono": "fritzing"},
-            {"id": "arduino", "nombre": "Arduino IDE", "desc": "Programación de placas Arduino", "icono": "arduino"},
-        ]
-    },
-    {
-        "categoria": "Creatividad y Multimedia",
-        "apps": [
-            {"id": "audacity", "nombre": "Audacity", "desc": "Editor de audio y grabación", "icono": "audacity"},
-            {"id": "inkscape", "nombre": "Inkscape", "desc": "Diseño vectorial (Illustrator libre)", "icono": "inkscape"},
             {"id": "blender", "nombre": "Blender", "desc": "Modelado y animación 3D profesional", "icono": "blender"},
+            {"id": "inkscape", "nombre": "Inkscape", "desc": "Diseño vectorial (Illustrator libre)", "icono": "inkscape"},
             {"id": "kdenlive", "nombre": "Kdenlive", "desc": "Editor de vídeo profesional", "icono": "kdenlive"},
             {"id": "obs-studio", "nombre": "OBS Studio", "desc": "Grabación y streaming de pantalla", "icono": "obs"},
             {"id": "lmms", "nombre": "LMMS", "desc": "Producción musical (DAW)", "icono": "lmms"},
         ]
     },
     {
-        "categoria": "Utilidades del Sistema",
+        "categoria": "Utilidades y Navegadores",
         "apps": [
-            {"id": "klavaro", "nombre": "Klavaro", "desc": "Curso de mecanografía serio", "icono": "klavaro"},
-            {"id": "gnome-network-displays", "nombre": "Pantallas Inalámbricas", "desc": "Conectar a proyectores Wifi", "icono": "preferences-desktop-display"},
-            {"id": "vlc", "nombre": "VLC", "desc": "Reproductor multimedia universal", "icono": "vlc"},
+            {"id": "vlc", "nombre": "VLC", "desc": "El reproductor que lo abre todo", "icono": "vlc"},
             {"id": "chromium-browser", "nombre": "Chromium", "desc": "Navegador web libre (Base Chrome)", "icono": "chromium-browser"},
-            {"id": "gbrainy", "nombre": "GBrainy", "desc": "Juegos de lógica y memoria", "icono": "gbrainy"},
+            {"id": "gnome-boxes", "nombre": "Cajas (Boxes)", "desc": "Máquinas virtuales sencillas", "icono": "gnome-boxes"},
+            {"id": "filezilla", "nombre": "FileZilla", "desc": "Cliente FTP", "icono": "filezilla"},
         ]
     }
 ]
@@ -141,6 +112,7 @@ class FilaApp(Gtk.ListBoxRow):
         box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
         box.set_border_width(10)
         
+        # Icono
         icon = Gtk.Image()
         icon.set_pixel_size(48)
         
@@ -154,6 +126,7 @@ class FilaApp(Gtk.ListBoxRow):
             
         box.pack_start(icon, False, False, 0)
 
+        # Texto
         vbox_text = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
         lbl_name = Gtk.Label(xalign=0)
         lbl_name.set_markup(f"<b>{app_data['nombre']}</b>")
@@ -165,9 +138,12 @@ class FilaApp(Gtk.ListBoxRow):
         vbox_text.pack_start(lbl_desc, True, True, 0)
         box.pack_start(vbox_text, True, True, 0)
 
+        # Controles
         self.switch = Gtk.Switch()
         self.switch.set_valign(Gtk.Align.CENTER)
-        self.switch.connect("state-set", self.on_switch_activated)
+        
+        # Guardamos el ID del evento para poder bloquearlo después
+        self.handler_id = self.switch.connect("state-set", self.on_switch_activated)
         
         self.spinner = Gtk.Spinner()
         
@@ -183,18 +159,26 @@ class FilaApp(Gtk.ListBoxRow):
         GLib.idle_add(self.update_switch_state, is_installed)
 
     def update_switch_state(self, state):
+        # Bloqueamos la señal para que el cambio NO dispare 'on_switch_activated'
+        self.switch.handler_block(self.handler_id)
         self.switch.set_active(state)
+        self.switch.handler_unblock(self.handler_id)
         return False
 
     def on_switch_activated(self, switch, state):
+        # Esta función SOLO se ejecuta si el usuario hace clic físicamente
         self.switch.set_sensitive(False)
         self.spinner.start()
         
         if hay_bloqueo_apt():
-            self.mostrar_error("El sistema de actualizaciones está ocupado.\n\nEspere unos minutos a que termine el icono de la barra de tareas e inténtelo de nuevo.")
+            self.mostrar_error("El sistema de actualizaciones está ocupado.\n\nEspere unos minutos.")
             self.spinner.stop()
             self.switch.set_sensitive(True)
-            switch.set_state(not state)
+            
+            # Revertimos visualmente en silencio
+            self.switch.handler_block(self.handler_id)
+            switch.set_active(not state)
+            self.switch.handler_unblock(self.handler_id)
             return True 
 
         action = "install" if state else "remove"
@@ -218,6 +202,7 @@ class FilaApp(Gtk.ListBoxRow):
         error_msg = ""
         success = False
         
+        # 1. SCRIPT PERSONALIZADO
         if action == "install" and "script_install" in self.app_data:
             nombre_script = self.app_data["script_install"]
             ruta_script = os.path.join(RUTA_SCRIPTS_REPO, nombre_script)
@@ -235,6 +220,8 @@ class FilaApp(Gtk.ListBoxRow):
                     error_msg = f"Excepción script: {e}"
             else:
                 error_msg = f"Script no encontrado: {nombre_script}"
+        
+        # 2. MODO APT-GET ESTÁNDAR
         else:
             cmd = [
                 "pkexec", 
@@ -267,16 +254,21 @@ class FilaApp(Gtk.ListBoxRow):
         self.spinner.stop()
         self.switch.set_sensitive(True)
         
+        # Bloqueamos señal para actualizar el estado final sin recursión
+        self.switch.handler_block(self.handler_id)
         if success:
-            self.switch.set_state(intended_state)
+            self.switch.set_active(intended_state)
             subprocess.Popen(['notify-send', '-i', 'system-software-update', 'GuadaMint Store', f'Operación completada: {self.app_data["nombre"]}'])
+            # Volvemos a comprobar estado real en segundo plano
             threading.Thread(target=self.check_installed).start()
         else:
-            self.switch.set_state(not intended_state)
+            self.switch.set_active(not intended_state)
             if error_msg:
                 self.mostrar_error(error_msg)
             else:
                 self.mostrar_error("Operación cancelada o fallida.")
+        
+        self.switch.handler_unblock(self.handler_id)
         return False
 
 class GuadaStoreWindow(Gtk.Window):
