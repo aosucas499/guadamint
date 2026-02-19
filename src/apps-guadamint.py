@@ -9,15 +9,26 @@ import threading
 import shutil
 import grp
 import time
+import datetime
 
 # ==============================================================================
-# CONFIGURACIÓN VISUAL
+# CONFIGURACIÓN
 # ==============================================================================
 ICONO_APP = "/usr/share/icons/guadamintuz.svg"
 TITULO_APP = "Centro de Software GuadaMint"
 
+# Configuración de Logs
+if os.geteuid() == 0:
+    LOG_FILE = "/var/log/guadamint/tienda.log"
+else:
+    LOG_FILE = f"/tmp/guadamint-tienda-{os.getuid()}.log"
+
+# Asegurar directorio de logs si somos root
+if os.geteuid() == 0 and not os.path.exists(os.path.dirname(LOG_FILE)):
+    try: os.makedirs(os.path.dirname(LOG_FILE))
+    except: pass
+
 # --- CATÁLOGO DE APLICACIONES ---
-# Excluidas las obligatorias del sistema (zram-tools, openboard)
 CATALOGO = [
     {
         "categoria": "Educación Infantil y Primaria",
@@ -88,6 +99,22 @@ SCRIPT_BIN = "/usr/bin/apps-guadamint.py"
 RUTA_SCRIPTS_REPO = "/opt/guadamint/src/scripts"
 
 # ==============================================================================
+# SISTEMA DE LOGS (REEMPLAZA A PRINT)
+# ==============================================================================
+def log(msg):
+    """Escribe en el archivo de log en lugar de la terminal."""
+    try:
+        timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        with open(LOG_FILE, "a") as f:
+            f.write(f"[{timestamp}] {msg}\n")
+    except: pass # Si falla el log, no rompemos la app
+
+# Redirigimos stdout y stderr al log para capturar todo
+# (Opcional, pero ayuda si alguna librería hace print)
+# sys.stdout = open(LOG_FILE, 'a')
+# sys.stderr = open(LOG_FILE, 'a')
+
+# ==============================================================================
 # SEGURIDAD Y PERMISOS
 # ==============================================================================
 def es_administrador():
@@ -102,15 +129,22 @@ def es_administrador():
 
 def elevar_a_root():
     if os.geteuid() != 0:
+        log("Elevando privilegios con pkexec...")
         usuario_real = os.environ.get('USER', 'usuario')
         env = os.environ.copy()
         if 'XAUTHORITY' not in env:
             possible_auth = f"/home/{usuario_real}/.Xauthority"
             if os.path.exists(possible_auth):
                 env['XAUTHORITY'] = possible_auth
-        args = ['pkexec', 'env', f'DISPLAY={env.get("DISPLAY", ":0")}', f'XAUTHORITY={env.get("XAUTHORITY", "")}', sys.executable] + sys.argv
-        try: os.execvpe('pkexec', args, env)
-        except Exception as e: print(f"Error elevación: {e}"); sys.exit(1)
+        
+        args = ['pkexec', 'env', f'DISPLAY={env.get("DISPLAY", ":0")}', 
+                f'XAUTHORITY={env.get("XAUTHORITY", "")}', 
+                sys.executable] + sys.argv
+        try:
+            os.execvpe('pkexec', args, env)
+        except Exception as e:
+            log(f"Error elevación: {e}")
+            sys.exit(1)
 
 def hay_bloqueo_apt():
     locks = ["/var/lib/dpkg/lock-frontend", "/var/lib/dpkg/lock"]
@@ -135,6 +169,7 @@ def auto_update():
         if os.path.exists(SCRIPT_SRC) and os.path.realpath(__file__) != os.path.realpath(SCRIPT_SRC):
             with open(SCRIPT_SRC, 'rb') as f1, open(SCRIPT_BIN, 'rb') as f2:
                 if f1.read() != f2.read():
+                    log("Actualizando script de la tienda...")
                     shutil.copy2(SCRIPT_SRC, SCRIPT_BIN)
                     os.chmod(SCRIPT_BIN, 0o755)
                     os.execv(sys.executable, [sys.executable] + sys.argv)
@@ -169,6 +204,8 @@ class FilaApp(Gtk.ListBoxRow):
         lbl_name.set_markup(f"<b>{app_data['nombre']}</b>")
         lbl_desc = Gtk.Label(label=app_data['desc'], xalign=0)
         lbl_desc.get_style_context().add_class("dim-label")
+        lbl_desc.set_max_width_chars(40)
+        lbl_desc.set_line_wrap(True)
         vbox_text.pack_start(lbl_name, True, True, 0)
         vbox_text.pack_start(lbl_desc, True, True, 0)
         box.pack_start(vbox_text, True, True, 0)
@@ -186,18 +223,14 @@ class FilaApp(Gtk.ListBoxRow):
         threading.Thread(target=self.check_installed).start()
 
     def check_installed(self):
-        # CAMBIO CRÍTICO: Usamos dpkg-query para ver si está realmente instalado "ok installed"
-        # dpkg -s falla si está desinstalado pero quedan configs (devuelve 0 y confunde al switch)
         try:
             res = subprocess.run(
                 ["dpkg-query", "-W", "-f='${Status}'", self.pkg_name], 
                 stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True
             )
-            # Solo consideramos instalado si dice explícitamente "install ok installed"
             is_installed = "install ok installed" in res.stdout
         except:
             is_installed = False
-            
         GLib.idle_add(self.update_switch_state, is_installed)
 
     def update_switch_state(self, state):
@@ -230,12 +263,11 @@ class FilaApp(Gtk.ListBoxRow):
         dialog.destroy()
 
     def run_apt_action(self, action):
-        print(f"\n>>> ACCIÓN: {action} {self.pkg_name}")
+        log(f"Iniciando acción: {action} {self.pkg_name}")
         error_msg = ""
         success = False
         cmd = []
         
-        # 1. SCRIPT PERSONALIZADO (Solo install)
         if action == "install" and "script_install" in self.app_data:
             nombre_script = self.app_data["script_install"]
             ruta_script = os.path.join(RUTA_SCRIPTS_REPO, nombre_script)
@@ -243,39 +275,39 @@ class FilaApp(Gtk.ListBoxRow):
                 os.chmod(ruta_script, 0o755)
                 cmd = ["/bin/bash", ruta_script]
             else:
-                error_msg = f"No se encuentra el script: {ruta_script}"
-        
-        # 2. MODO APT-GET ESTÁNDAR (Install y Remove)
+                error_msg = f"Script no encontrado: {ruta_script}"
         else:
             cmd = ["env", "DEBIAN_FRONTEND=noninteractive", "/usr/bin/apt-get", action, "-y", "-o", "Dpkg::Options::=--force-confdef", "-o", "Dpkg::Options::=--force-confold", self.pkg_name]
 
-        # EJECUCIÓN CON FLUSH EN TIEMPO REAL
         if cmd:
             try:
+                # Ejecutamos redirigiendo stdout/stderr a PIPE para escribirlos luego en el log
+                # NO usamos print aquí para evitar que salga en terminal
                 process = subprocess.Popen(
                     cmd, 
                     stdout=subprocess.PIPE, 
                     stderr=subprocess.STDOUT, 
-                    text=True, 
-                    bufsize=1 # Line buffered para ver el progreso real
+                    text=True
                 )
                 
-                # Leer línea a línea para que no se congele
+                # Leemos la salida y la mandamos al log
                 full_log = ""
                 for line in process.stdout:
-                    print(line, end='') 
+                    log(f"[APT] {line.strip()}") # Escribe en el archivo
                     full_log += line
                 
                 process.wait()
                 
                 if process.returncode == 0:
                     success = True
+                    log("Acción completada con éxito.")
                 else:
+                    log(f"Error (Código {process.returncode})")
                     if "Unable to locate" in full_log: error_msg = f"Paquete no encontrado."
                     elif "lock" in full_log: error_msg = "Bloqueo APT."
-                    else: error_msg = "Error en la ejecución. Ver terminal."
+                    else: error_msg = "Error en la ejecución. Ver logs."
             except Exception as e:
-                print(f"Excepción: {e}")
+                log(f"Excepción Python: {e}")
                 error_msg = str(e)
 
         GLib.idle_add(self.finish_action, success, action == "install", error_msg)
@@ -291,9 +323,9 @@ class FilaApp(Gtk.ListBoxRow):
             subprocess.Popen(['sudo', '-u', user, 'notify-send', '-i', 'system-software-update', 'GuadaMint Store', f'Operación completada: {self.app_data["nombre"]}'])
             threading.Thread(target=self.check_installed).start()
         else:
-            self.switch.set_active(not intended_state) # Volver atrás
+            self.switch.set_active(not intended_state)
             if error_msg: self.mostrar_error(error_msg)
-            else: self.mostrar_error("Operación fallida.")
+            else: self.mostrar_error("Operación fallida. Revise los logs.")
         
         self.switch.handler_unblock(self.handler_id)
         return False
