@@ -10,7 +10,7 @@ Exec=sudo /usr/bin/guadamint-update.py
 # Ruta del icono instalado
 Icon=/usr/share/icons/guadamintuz.svg
 # Terminal=false para que no se abra una ventana negra al inicio
-Terminal=true
+Terminal=false
 Categories=System;Settings;
 # Configuración para inicio automático en GNOME/Cinnamon/XFCE
 X-GNOME-Autostart-enabled=true
