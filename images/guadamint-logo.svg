@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="160" height="160">
+                <defs>
+                    <!-- Gradiente Verde Bandera de Andalucía (Verde Omeya) -->
+                    <linearGradient id="mintGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" stop-color="#008A38"></stop> <!-- Brillo superior (verde andaluz claro) -->
+                        <stop offset="100%" stop-color="#006729"></stop> <!-- Verde oficial Andalucía -->
+                    </linearGradient>
+                    <!-- Sombra sutil interna para dar volumen -->
+                    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+                        <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="#000000" flood-opacity="0.25"></feDropShadow>
+                    </filter>
+                </defs>
+
+                <!-- Círculo Base -->
+                <circle cx="128" cy="128" r="115" fill="url(#mintGrad)" filter="url(#glow)"></circle>
+
+                <!-- Anillo decorativo interior (estilo Mint clásico) -->
+                <circle cx="128" cy="128" r="95" fill="none" stroke="#ffffff" stroke-width="4" opacity="0.4"></circle>
+
+                <!-- Letras G y M diseñadas con trazado geométrico -->
+                <g fill="none" stroke="#ffffff" stroke-width="20" stroke-linecap="round" stroke-linejoin="round">
+                    <!-- Trazado Letra G -->
+                    <path d="M 115 103 A 35.35 35.35 0 1 0 115 153 L 115 128 L 95 128"></path>
+                    <!-- Trazado Letra M -->
+                    <path d="M 140 163 L 140 93 L 170 128 L 200 93 L 200 163"></path>
+                </g>
+            </svg>
