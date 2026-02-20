@@ -5,5 +5,5 @@ Name[es]=Tienda GuadaMint
 Comment=Instalar aplicaciones educativas
 Exec=/usr/bin/apps-guadamint.py
 Icon=/usr/share/icons/guadamintuz.svg
-Terminal=false
+Terminal=true
 Categories=System;Settings;PackageManager;
