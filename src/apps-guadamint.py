@@ -103,6 +103,9 @@ RUTA_SCRIPTS_REPO = "/opt/guadamint/src/scripts"
 # ==============================================================================
 def log(msg):
     try:
+        # Añadimos print para que se vea en la terminal si se lanza con Terminal=true
+        print(msg)
+        
         timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         with open(LOG_FILE, "a") as f:
             f.write(f"[{timestamp}] {msg}\n")
