@@ -52,6 +52,8 @@ CATALOGO = [
             {"id": "kgeography", "nombre": "KGeography", "desc": "Geografía mundial", "icono": "kgeography"},
             {"id": "kwordquiz", "nombre": "KWordQuiz", "desc": "Tarjetas de vocabulario", "icono": "kwordquiz"},
             {"id": "celestia", "nombre": "Celestia", "desc": "Simulador espacial 3D", "icono": "celestia"},
+            {"id": "klavaro", "nombre": "Klavaro", "desc": "Curso de mecanografía", "icono": "klavaro"},
+            {"id": "gbrainy", "nombre": "GBrainy", "desc": "Juegos de lógica", "icono": "gbrainy"},
         ]
     },
     {
@@ -80,12 +82,9 @@ CATALOGO = [
         "categoria": "Utilidades y Navegadores",
         "apps": [
             {"id": "google-chrome-stable", "nombre": "Google Chrome", "desc": "Navegador oficial Google", "icono": "google-chrome", "script_install": "instalar_chrome.sh"},
-            {"id": "klavaro", "nombre": "Klavaro", "desc": "Curso de mecanografía", "icono": "klavaro"},
             {"id": "gnome-network-displays", "nombre": "Pantallas Wifi", "desc": "Proyección inalámbrica", "icono": "preferences-desktop-display"},
             {"id": "vlc", "nombre": "VLC", "desc": "Reproductor multimedia", "icono": "vlc"},
             {"id": "chromium-browser", "nombre": "Chromium", "desc": "Navegador libre", "icono": "chromium-browser"},
-            {"id": "gbrainy", "nombre": "GBrainy", "desc": "Juegos de lógica", "icono": "gbrainy"},
-            {"id": "filezilla", "nombre": "FileZilla", "desc": "Cliente FTP", "icono": "filezilla"},
         ]
     }
 ]
