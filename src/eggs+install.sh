@@ -4,10 +4,10 @@
 eggs adapt
 
 # establecer nuestros iconos, fondos para todos los usuarios
-eggs tools skel
+sudo eggs tools skel
 
 # get the wardrobe of penguin eggs
-eggs wardrove get
+eggs wardrobe get
 
 #copy our guadamint clothes
 sudo cp -r /opt/guadamint/vendors/guadamint /home/$USER/.wardrobe/vendors/
