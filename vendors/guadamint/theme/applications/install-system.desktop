@@ -2,13 +2,13 @@
 Type=Application
 Version=1.0
 Name=Install System
-GenericName=System Installer
-Keywords=calamares;system;installer;
+GenericName=Instalador sistema
+Keywords=calamares;system;installer;instalador;
 Exec=sh -c "pkexec /usr/bin/calamares"
 # Exec=pkexec calamares
 TryExec=calamares
-Comment=Calamares — System Installer
-Icon=install-debian
+Comment=Instalador del sistema
+Icon=install-system
 Terminal=false
 StartupNotify=true
 Categories=Qt;System;
