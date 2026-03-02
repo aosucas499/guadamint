@@ -9,7 +9,7 @@ snapshot_basename: stable-xfce
 snapshot_dir: /home/eggs/
 snapshot_excludes: /etc/penguins-eggs.d/exclude.list
 snapshot_mnt: /home/eggs/mnt/
-snapshot_prefix: guadamint-22.3_v1.0-josefa
+snapshot_prefix: guadamint-22.3_v1.0-josefa-
 ssh_pass: true
 theme: guadamint
 timezone: Europe/Madrid
