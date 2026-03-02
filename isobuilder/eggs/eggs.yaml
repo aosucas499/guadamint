@@ -1,24 +1,19 @@
-version: 9.3.7
+compression: fast
+force_installer: true
+initrd_img: /boot/initrd.img-6.14.0-37-generic
+make_efi: true
+make_isohybrid: true
+make_md5sum: false
+root_passwd: root
+snapshot_basename: Official
 snapshot_dir: /home/eggs/
+snapshot_excludes: /etc/penguins-eggs.d/exclude.list
+snapshot_mnt: /home/eggs/mnt/
 snapshot_prefix: guadamint
-snapshot_excludes: /usr/local/share/penguins-eggs/exclude.list
-snapshot_basename: Unofficial
+ssh_pass: true
+theme: guadamint
+timezone: Europe/Madrid
 user_opt: administrador
 user_opt_passwd: root
-root_passwd: root
-theme: guadamint
-force_installer: true
-make_efi: true
-make_md5sum: false
-make_isohybrid: true
-compression: zstd -b 256K -Xcompression-level 20
-ssh_pass: true
-timezone: Europe/Madrid
-locales_default: es_ES.UTF-8
-locales:
-  - es_ES.UTF-8
-  - en_US.UTF-8
-pmount_fixed: false
-machine_id: 981504531be4413f876a78633da6f084
-vmlinuz: /boot/vmlinuz-5.4.0-66-generic
-initrd_img: /boot/initrd.img-5.4.0-66-generic
+version: 26.2.20
+vmlinuz: /boot/vmlinuz-6.14.0-37-generic
