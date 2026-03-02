@@ -44,4 +44,4 @@ sudo eggs kill
 sudo apt-get update -y
 
 #crear iso definitiva
-sudo eggs produce -v --theme educaandos 
+sudo eggs produce -v --theme guadamint
