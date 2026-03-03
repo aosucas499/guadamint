@@ -37,7 +37,7 @@ SCRIPT_BIN_PATH = "/usr/bin/guadamint-update.py"
 # LISTA DE APPS OBLIGATORIAS (SISTEMA BASE)
 APPS_OBLIGATORIAS = [
     "zram-tools",  # Optimización de RAM
-    "openboard"    # Pizarra digital
+    "openboard",    # Pizarra digital
      "screen"       # Multiplexor de terminal
 ]
 
