@@ -38,6 +38,7 @@ SCRIPT_BIN_PATH = "/usr/bin/guadamint-update.py"
 APPS_OBLIGATORIAS = [
     "zram-tools",  # Optimización de RAM
     "openboard"    # Pizarra digital
+     "screen"       # Multiplexor de terminal
 ]
 
 logging.basicConfig(filename=LOG_FILE, level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
