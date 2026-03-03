@@ -254,6 +254,20 @@ def ocultar_lista_usuarios_login():
             f.write("[Seat:*]\ngreeter-hide-users=true\nallow-guest=false\n")
     except: pass
 
+def eliminar_mint_welcome():
+    """Elimina los accesos directos y el autoarranque de la bienvenida de Linux Mint"""
+    archivos = [
+        "/usr/share/applications/mintwelcome.desktop",
+        "/etc/xdg/autostart/mintwelcome.desktop"
+    ]
+    for archivo in archivos:
+        if os.path.exists(archivo):
+            try:
+                os.remove(archivo)
+                log_y_print(f">>> Eliminado: {archivo}")
+            except Exception as e:
+                log_y_print(f"!!! Error al eliminar {archivo}: {e}")
+
 def verificar_e_instalar_apps():
     faltantes = [app for app in APPS_OBLIGATORIAS if subprocess.run(["dpkg", "-s", app], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode != 0]
     if faltantes:
@@ -283,6 +297,7 @@ def main():
         # Mantenimiento
         verificar_crear_usuario_alumno()
         ocultar_lista_usuarios_login()
+        eliminar_mint_welcome()
         verificar_e_instalar_apps()
         
         if escritorio == "XFCE": pass
