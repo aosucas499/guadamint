@@ -1,7 +1,8 @@
 #!/bin/bash 
 
-# para ver bien en virtualbox
-eggs adapt
+#Modificar los archivos del grub para que tenga el archivo splash de guadamint despues de instalado en lugar del de linux mint.
+
+#modificar el plymouth o grub desactivando los valores quiet splash por quiet. De esta manera quitamos el logo de linux mint en el boot.
 
 # establecer nuestros iconos, fondos para todos los usuarios
 sudo eggs tools skel
@@ -15,19 +16,9 @@ sudo cp -r /opt/guadamint/vendors/guadamint /home/$USER/.wardrobe/vendors/
 #instalar calamares 
 sudo eggs calamares --install --theme guadamint
 
-# paquetes necesarios para instalación en EFI secureboot
-#sudo dpkg -i grub-efi-amd64-signed*amd64.deb
-sudo apt update -y 
-#sudo apt-get install grub-efi-amd64-signed -y 
-#sudo apt-get install shim-signed -y
-
 #eliminar archivos innecesarios de EGGS
-sudo rm /usr/share/applications/calamares.desktop
 sudo rm /usr/lib/penguins-eggs/assets/penguins-eggs.desktop
 sudo rm /usr/lib/penguins-eggs/assets/penguins-links-add.desktop
-
-# NOW, we configure eggs, whit it's default 
-sudo eggs dad -d
 
 # Modify settings for iso
 #sudo nano /etc/penguins-eggs.d/eggs.yaml
@@ -38,10 +29,8 @@ sudo cp /opt/guadamint/vendors/guadamint/penguins-eggs.d/eggs.yaml /etc/penguins
 sudo nano /etc/penguins-eggs.d/eggs.yaml
 
 # instala lo necesario para la iso y borra scripts de creación de iso
-sudo eggs produce -vs --theme guadamint
+#sudo eggs produce -vs --theme guadamint
 sudo eggs kill
 
-sudo apt-get update -y
-
 #crear iso definitiva
-sudo eggs produce -v --theme guadamint
+sudo eggs produce -v --theme guadamint --release --links calamares
