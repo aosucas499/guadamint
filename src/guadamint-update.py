@@ -35,10 +35,9 @@ ARCHIVOS_A_SINCRONIZAR = [
 SCRIPT_BIN_PATH = "/usr/bin/guadamint-update.py"
 
 # LISTA DE APPS OBLIGATORIAS (SISTEMA BASE)
-# Solo dejamos lo esencial para el funcionamiento del aula
 APPS_OBLIGATORIAS = [
     "zram-tools",  # Optimización de RAM
-    "openboard"    # Pizarra digital (básica en todas las aulas)
+    "openboard"    # Pizarra digital
 ]
 
 logging.basicConfig(filename=LOG_FILE, level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -71,10 +70,10 @@ def auto_actualizar_desde_git():
         try:
             subprocess.run(["git", "clone", "-b", REPO_BRANCH, REPO_URL, REPO_DIR], check=True)
             hay_cambios_git = True
-            mensaje_git = "Se ha descargado el repositorio por primera vez con éxito."
+            mensaje_git = "Se ha descargado el sistema base por primera vez."
         except Exception as e:
             log_y_print(f"!!! Error al clonar: {e}")
-            mostrar_aviso("Error de Actualización", f"No se pudo descargar de GitHub:\n{e}", "error")
+            mostrar_aviso("Error de Red", "No se pudo conectar con GitHub.", "error")
             return 
     else:
         try:
@@ -88,27 +87,32 @@ def auto_actualizar_desde_git():
             if local_hash != remote_hash:
                 log_y_print(f">>> Git: Actualización detectada ({local_hash[:7]} -> {remote_hash[:7]})")
                 
-                # Intentamos capturar qué commits son nuevos para enseñarlos en el aviso
+                # Capturamos el resumen limitando a 3 líneas para que quepa bien en la notificación
                 try:
-                    resumen = subprocess.check_output(["git", "log", "--oneline", f"{local_hash}..{remote_hash}"], text=True).strip()
+                    resumen_completo = subprocess.check_output(["git", "log", "--oneline", f"{local_hash}..{remote_hash}"], text=True).strip()
+                    lineas = resumen_completo.split('\n')
+                    if len(lineas) > 3:
+                        resumen = '\n'.join(lineas[:3]) + '\n... y más cambios.'
+                    else:
+                        resumen = resumen_completo
                 except:
-                    resumen = "Nuevos archivos actualizados en el código fuente."
+                    resumen = "Nuevos archivos sincronizados."
                     
                 subprocess.run(["git", "reset", "--hard", f"origin/{REPO_BRANCH}"], check=True)
                 hay_cambios_git = True
-                mensaje_git = f"Se han descargado nuevos cambios desde GitHub con éxito.\n\nResumen de actualizaciones:\n{resumen}"
+                mensaje_git = f"{resumen}"
             else:
                 log_y_print(">>> Git: El repositorio está al día.")
         except Exception as e:
             log_y_print(f"!!! Error git: {e}")
-            mostrar_aviso("Error de Actualización", f"Fallo al comprobar GitHub:\n{e}", "error")
+            mostrar_aviso("Error", "Fallo al comprobar actualizaciones.", "error")
             return
 
-    # --- AVISO GRÁFICO DEL ESTADO DE GITHUB ---
+    # --- AVISO GRÁFICO (NOTIFICACIÓN DE ESCRITORIO NO INVASIVA) ---
     if hay_cambios_git:
-        mostrar_aviso("¡GuadaMint Actualizado!", mensaje_git)
+        mostrar_aviso("GuadaMint Actualizado", mensaje_git)
     else:
-        mostrar_aviso("Estado de Actualización", "Todo está al día.\n\nNo se han encontrado cambios nuevos en el repositorio de GuadaMint.")
+        mostrar_aviso("Sistema al día", "No hay actualizaciones nuevas.")
 
     # 2. Sincronizar archivos al sistema
     se_requiere_reinicio = False
@@ -193,11 +197,22 @@ def cerrar_tray_icon():
         except: pass
 
 def mostrar_aviso(titulo, mensaje, icono="info"):
+    """
+    Muestra una notificación de escritorio (burbuja flotante) en lugar de una ventana invasiva.
+    """
     usuario = obtener_usuario_real()
     if not usuario: return
     entorno = os.environ.copy()
     entorno.update(obtener_entorno_usuario(usuario))
-    try: subprocess.Popen(['sudo', '-u', usuario, 'zenity', '--info', '--title', titulo, '--text', mensaje, '--width=400', '--timeout=10', f'--window-icon={icono}'], env=entorno, stderr=subprocess.DEVNULL)
+    
+    # Seleccionamos el icono para la notificación
+    icono_notif = ICONO_DEFECTO if os.path.exists(ICONO_DEFECTO) else "dialog-information"
+    if icono == "error":
+        icono_notif = "dialog-error"
+        
+    try: 
+        # Utilizamos notify-send para mostrar la burbuja de notificación
+        subprocess.Popen(['sudo', '-u', usuario, 'notify-send', '-a', 'GuadaMint Update', '-i', icono_notif, titulo, mensaje], env=entorno, stderr=subprocess.DEVNULL)
     except: pass
 
 def detectar_escritorio():
