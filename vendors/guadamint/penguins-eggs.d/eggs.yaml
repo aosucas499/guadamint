@@ -13,7 +13,7 @@ snapshot_prefix: guadamint-22.3_v1.0-josefa-
 ssh_pass: true
 theme: guadamint
 timezone: Europe/Madrid
-user_opt: administrador
+user_opt: admin
 user_opt_passwd: root
 version: 26.2.28
 vmlinuz: /boot/vmlinuz-6.14.0-37-generic
