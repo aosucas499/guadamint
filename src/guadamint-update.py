@@ -63,6 +63,8 @@ def auto_actualizar_desde_git():
     
     hay_cambios_git = False
     mensaje_git = ""
+    # Detectamos si el script acaba de reiniciarse automáticamente
+    es_reinicio = '--restarted' in sys.argv
     
     # 1. Clonar o Actualizar el Repositorio en /opt
     if not os.path.exists(REPO_DIR):
@@ -112,7 +114,8 @@ def auto_actualizar_desde_git():
     # --- AVISO GRÁFICO (NOTIFICACIÓN DE ESCRITORIO NO INVASIVA) ---
     if hay_cambios_git:
         mostrar_aviso("GuadaMint Actualizado", mensaje_git)
-    else:
+    elif not es_reinicio:
+        # Solo mostramos que está al día si NO venimos de un reinicio automático
         mostrar_aviso("Sistema al día", "No hay actualizaciones nuevas.")
 
     # 2. Sincronizar archivos al sistema
@@ -144,7 +147,11 @@ def auto_actualizar_desde_git():
         try:
             if TRAY_PROCESS: cerrar_tray_icon()
             time.sleep(1)
-            os.execv(sys.executable, ['python3'] + sys.argv)
+            # Añadimos la "palabra secreta" --restarted para que la próxima ejecución sea silenciosa
+            argumentos = sys.argv[:]
+            if '--restarted' not in argumentos:
+                argumentos.append('--restarted')
+            os.execv(sys.executable, ['python3'] + argumentos)
         except Exception as e:
             log_y_print(f"!!! Error crítico reinicio: {e}")
 
