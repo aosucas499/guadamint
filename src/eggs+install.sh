@@ -1,10 +1,16 @@
 #!/bin/bash 
 
+# cambiarmos el fondo de escritorio. 
+
+# el logo del boton de inicio se cambia con el boton derecho pulsando en él. 
+
 #Modificar los archivos del grub para que tenga el archivo splash de guadamint despues de instalado en lugar del de linux mint.
 
 #modificar el plymouth o grub desactivando los valores quiet splash por quiet. De esta manera quitamos el logo de linux mint en el boot.
 
 # Para desactivar las aplicaciones de inicio de linux mint buscamos en /etc/xdg/autostart y /usr/share/applications y borramos: mintwelcome
+
+# Para la pantalla de inicio de usuarios, se cambia en la aplicación ventana de inicio de sesion.
 
 # establecer nuestros iconos, fondos para todos los usuarios
 sudo eggs tools skel
