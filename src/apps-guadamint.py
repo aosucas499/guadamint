@@ -1,318 +1,415 @@
 #!/usr/bin/env python3
+import gi
+gi.require_version('Gtk', '3.0')
+from gi.repository import Gtk, Gdk, GLib, GdkPixbuf
 import subprocess
-import logging
 import os
 import sys
-import time
+import threading
 import shutil
-import random
-import filecmp
+import grp
+import time
+import datetime
 
 # ==============================================================================
 # CONFIGURACIÓN
 # ==============================================================================
-LOG_FILE = "/var/log/guadamint/actualizador.log"
-LOCK_FILE = "/tmp/guadamint-updating.lock"
-ICONO_DEFECTO = "/usr/share/icons/guadamintuz.svg"
+ICONO_APP = "/usr/share/icons/guadamintuz.svg"
+TITULO_APP = "Centro de Software GuadaMint"
 
-# --- CONFIGURACIÓN GIT ---
-REPO_URL = "https://github.com/aosucas499/guadamint.git"
-REPO_DIR = "/opt/guadamint"
-REPO_BRANCH = "main" 
+# Configuración de Logs
+if os.geteuid() == 0:
+    LOG_FILE = "/var/log/guadamint/tienda.log"
+else:
+    LOG_FILE = f"/tmp/guadamint-tienda-{os.getuid()}.log"
 
-# --- ARCHIVOS QUE SE DEBEN ACTUALIZAR DESDE GITHUB ---
-ARCHIVOS_A_SINCRONIZAR = [
+# Asegurar directorio de logs si somos root
+if os.geteuid() == 0 and not os.path.exists(os.path.dirname(LOG_FILE)):
+    try: os.makedirs(os.path.dirname(LOG_FILE))
+    except: pass
+
+# --- CATÁLOGO DE APLICACIONES ---
+CATALOGO = [
     {
-        "origen": "src/guadamint-update.py", 
-        "destino": "/usr/bin/guadamint-update.py"
+        "categoria": "Educación Infantil y Primaria",
+        "apps": [
+            {"id": "gcompris-qt", "nombre": "GCompris", "desc": "Suite educativa (2-10 años)", "icono": "gcompris-qt"},
+            {"id": "tuxtype", "nombre": "Tux Typing", "desc": "Mecanografía infantil", "icono": "tuxtype"},
+            {"id": "tuxmath", "nombre": "Tux Math", "desc": "Matemáticas arcade", "icono": "tuxmath"},
+            {"id": "tuxpaint", "nombre": "Tux Paint", "desc": "Dibujo para niños", "icono": "tuxpaint"},
+            {"id": "kanagram", "nombre": "Kanagram", "desc": "Anagramas y vocabulario", "icono": "kanagram"},
+            {"id": "khangman", "nombre": "KHangMan", "desc": "Juego del ahorcado", "icono": "khangman"},
+        ]
     },
     {
-        "origen": "src/apps-guadamint.py",   
-        "destino": "/usr/bin/apps-guadamint.py"
+        "categoria": "Educación Secundaria y Bachillerato",
+        "apps": [
+            {"id": "geogebra", "nombre": "GeoGebra", "desc": "Matemáticas dinámicas", "icono": "geogebra"},
+            {"id": "stellarium", "nombre": "Stellarium", "desc": "Planetario virtual", "icono": "stellarium"},
+            {"id": "kalzium", "nombre": "Kalzium", "desc": "Tabla periódica", "icono": "kalzium"},
+            {"id": "step", "nombre": "Step", "desc": "Simulador físico", "icono": "step"},
+            {"id": "marble", "nombre": "Marble", "desc": "Globo terráqueo virtual", "icono": "marble"},
+            {"id": "kgeography", "nombre": "KGeography", "desc": "Geografía mundial", "icono": "kgeography"},
+            {"id": "kwordquiz", "nombre": "KWordQuiz", "desc": "Tarjetas de vocabulario", "icono": "kwordquiz"},
+            {"id": "celestia", "nombre": "Celestia", "desc": "Simulador espacial 3D", "icono": "celestia"},
+            {"id": "klavaro", "nombre": "Klavaro", "desc": "Curso de mecanografía", "icono": "klavaro"},
+            {"id": "gbrainy", "nombre": "GBrainy", "desc": "Juegos de lógica", "icono": "gbrainy"},
+        ]
+    },
+    {
+        "categoria": "Programación y Robótica",
+        "apps": [
+            {"id": "scratch", "nombre": "Scratch", "desc": "Programación visual", "icono": "scratch"},
+            {"id": "kturtle", "nombre": "KTurtle", "desc": "Programación Logo", "icono": "kturtle"},
+            {"id": "thonny", "nombre": "Thonny", "desc": "Python para principiantes", "icono": "thonny"},
+            {"id": "minetest", "nombre": "Minetest", "desc": "Mundo abierto (Minecraft libre)", "icono": "minetest"},
+            {"id": "fritzing", "nombre": "Fritzing", "desc": "Diseño de circuitos", "icono": "fritzing"},
+            {"id": "arduino", "nombre": "Arduino IDE", "desc": "Programación Arduino", "icono": "arduino"},
+        ]
+    },
+    {
+        "categoria": "Creatividad y Multimedia",
+        "apps": [
+            {"id": "audacity", "nombre": "Audacity", "desc": "Editor de audio", "icono": "audacity"},
+            {"id": "inkscape", "nombre": "Inkscape", "desc": "Diseño vectorial", "icono": "inkscape"},
+            {"id": "blender", "nombre": "Blender", "desc": "Animación 3D", "icono": "blender"},
+            {"id": "kdenlive", "nombre": "Kdenlive", "desc": "Editor de vídeo", "icono": "kdenlive"},
+            {"id": "obs-studio", "nombre": "OBS Studio", "desc": "Grabación de pantalla", "icono": "obs"},
+            {"id": "lmms", "nombre": "LMMS", "desc": "Producción musical", "icono": "lmms"},
+        ]
+    },
+    {
+        "categoria": "Utilidades y Navegadores",
+        "apps": [
+            {"id": "google-chrome-stable", "nombre": "Google Chrome", "desc": "Navegador oficial Google", "icono": "google-chrome", "script_install": "instalar_chrome.sh"},
+            {"id": "gnome-network-displays", "nombre": "Pantallas Wifi", "desc": "Proyección inalámbrica", "icono": "preferences-desktop-display"},
+            {"id": "vlc", "nombre": "VLC", "desc": "Reproductor multimedia", "icono": "vlc"},
+            {"id": "chromium-browser", "nombre": "Chromium", "desc": "Navegador libre", "icono": "chromium-browser"},
+        ]
     }
 ]
 
-SCRIPT_BIN_PATH = "/usr/bin/guadamint-update.py"
-
-# LISTA DE APPS OBLIGATORIAS (SISTEMA BASE)
-APPS_OBLIGATORIAS = [
-    "zram-tools",  # Optimización de RAM
-    "openboard"    # Pizarra digital
-]
-
-logging.basicConfig(filename=LOG_FILE, level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-TRAY_PROCESS = None
+# --- AUTO-UPDATE CONFIG ---
+REPO_DIR = "/opt/guadamint"
+REPO_URL = "https://github.com/aosucas499/guadamint.git"
+REPO_BRANCH = "main"
+SCRIPT_SRC = os.path.join(REPO_DIR, "src/apps-guadamint.py")
+SCRIPT_BIN = "/usr/bin/apps-guadamint.py"
+RUTA_SCRIPTS_REPO = "/opt/guadamint/src/scripts"
 
 # ==============================================================================
-# FUNCIONES BÁSICAS
+# SISTEMA DE LOGS
 # ==============================================================================
-
-def log_y_print(mensaje):
-    print(mensaje, flush=True)
-    logging.info(mensaje)
-
-def obtener_usuario_real():
-    return os.environ.get('SUDO_USER')
-
-# ==============================================================================
-# SISTEMA DE AUTO-ACTUALIZACIÓN (GIT MULTI-ARCHIVO)
-# ==============================================================================
-
-def auto_actualizar_desde_git():
-    log_y_print(f"--- Comprobando actualizaciones del repositorio (Rama: {REPO_BRANCH}) ---")
-    
-    hay_cambios_git = False
-    mensaje_git = ""
-    # Detectamos si el script acaba de reiniciarse automáticamente
-    es_reinicio = '--restarted' in sys.argv
-    
-    # 1. Clonar o Actualizar el Repositorio en /opt
-    if not os.path.exists(REPO_DIR):
-        log_y_print(f">>> Clonando repositorio en {REPO_DIR}...")
-        try:
-            subprocess.run(["git", "clone", "-b", REPO_BRANCH, REPO_URL, REPO_DIR], check=True)
-            hay_cambios_git = True
-            mensaje_git = "Se ha descargado el sistema base por primera vez."
-        except Exception as e:
-            log_y_print(f"!!! Error al clonar: {e}")
-            mostrar_aviso("Error de Red", "No se pudo conectar con GitHub.", "error")
-            return 
-    else:
-        try:
-            os.chdir(REPO_DIR)
-            subprocess.run(["git", "fetch", "origin"], check=True, stderr=subprocess.DEVNULL)
-            subprocess.run(["git", "checkout", REPO_BRANCH], check=True, stderr=subprocess.DEVNULL)
-            
-            local_hash = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()
-            remote_hash = subprocess.check_output(["git", "rev-parse", f"origin/{REPO_BRANCH}"], text=True).strip()
-            
-            if local_hash != remote_hash:
-                log_y_print(f">>> Git: Actualización detectada ({local_hash[:7]} -> {remote_hash[:7]})")
-                
-                # Capturamos el resumen limitando a 3 líneas para que quepa bien en la notificación
-                try:
-                    # Usamos --pretty=format:"• %s" para quitar el hash (números) y dejar solo el texto del mensaje
-                    resumen_completo = subprocess.check_output(["git", "log", "--pretty=format:• %s", f"{local_hash}..{remote_hash}"], text=True).strip()
-                    lineas = resumen_completo.split('\n')
-                    if len(lineas) > 3:
-                        resumen = '\n'.join(lineas[:3]) + '\n... y más cambios.'
-                    else:
-                        resumen = resumen_completo
-                except:
-                    resumen = "Nuevos archivos sincronizados."
-                    
-                subprocess.run(["git", "reset", "--hard", f"origin/{REPO_BRANCH}"], check=True)
-                hay_cambios_git = True
-                mensaje_git = f"{resumen}"
-            else:
-                log_y_print(">>> Git: El repositorio está al día.")
-        except Exception as e:
-            log_y_print(f"!!! Error git: {e}")
-            mostrar_aviso("Error", "Fallo al comprobar actualizaciones.", "error")
-            return
-
-    # --- AVISO GRÁFICO (NOTIFICACIÓN DE ESCRITORIO NO INVASIVA) ---
-    if hay_cambios_git:
-        mostrar_aviso("GuadaMint Actualizado", mensaje_git)
-    elif not es_reinicio:
-        # Solo mostramos que está al día si NO venimos de un reinicio automático
-        mostrar_aviso("Sistema al día", "No hay actualizaciones nuevas.")
-
-    # 2. Sincronizar archivos al sistema
-    se_requiere_reinicio = False
-    
-    for item in ARCHIVOS_A_SINCRONIZAR:
-        ruta_origen = os.path.join(REPO_DIR, item["origen"])
-        ruta_destino = item["destino"]
+def log(msg):
+    try:
+        # Añadimos print para que se vea en la terminal si se lanza con Terminal=true
+        print(msg)
         
-        try:
-            if os.path.exists(ruta_origen):
-                if hay_cambios_git or not os.path.exists(ruta_destino) or \
-                   not filecmp.cmp(ruta_origen, ruta_destino, shallow=False):
-                    
-                    log_y_print(f">>> Actualizando archivo: {os.path.basename(ruta_destino)}")
-                    shutil.copy2(ruta_origen, ruta_destino)
-                    os.chmod(ruta_destino, 0o755)
-                    
-                    if ruta_destino == SCRIPT_BIN_PATH:
-                        se_requiere_reinicio = True
-            else:
-                log_y_print(f"!!! Aviso: Archivo fuente no encontrado en repo: {item['origen']}")
-        except Exception as e:
-            log_y_print(f"!!! Error sincronizando {ruta_destino}: {e}")
-
-    # 3. Reiniciar si el propio script cambió
-    if se_requiere_reinicio:
-        log_y_print(">>> EL ACTUALIZADOR SE HA ACTUALIZADO. REINICIANDO PROCESO...")
-        try:
-            if TRAY_PROCESS: cerrar_tray_icon()
-            time.sleep(1)
-            # Añadimos la "palabra secreta" --restarted para que la próxima ejecución sea silenciosa
-            argumentos = sys.argv[:]
-            if '--restarted' not in argumentos:
-                argumentos.append('--restarted')
-            os.execv(sys.executable, ['python3'] + argumentos)
-        except Exception as e:
-            log_y_print(f"!!! Error crítico reinicio: {e}")
+        timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        with open(LOG_FILE, "a") as f:
+            f.write(f"[{timestamp}] {msg}\n")
+    except: pass
 
 # ==============================================================================
-# FUNCIONES DE INTERFAZ Y SISTEMA
+# SEGURIDAD Y PERMISOS
 # ==============================================================================
-
-def obtener_entorno_usuario(usuario):
-    env_vars = {'DISPLAY': ':0'}
+def es_administrador():
     try:
-        pids = subprocess.check_output(["pgrep", "-u", usuario, "-f", "session"], text=True).split()
-        for pid in pids:
-            try:
-                with open(f"/proc/{pid}/environ", "rb") as f: content = f.read().decode("utf-8", errors="ignore")
-                for item in content.split('\0'):
-                    if item.startswith("DBUS") or item.startswith("DISPLAY"):
-                        k, v = item.split("=", 1)
-                        env_vars[k] = v
-                if 'DBUS_SESSION_BUS_ADDRESS' in env_vars: break
-            except: continue
-    except: pass
-    return env_vars
-
-def iniciar_tray_icon():
-    global TRAY_PROCESS
-    usuario = obtener_usuario_real()
-    if not usuario: return
-    entorno = os.environ.copy()
-    entorno.update(obtener_entorno_usuario(usuario))
-    icono = ICONO_DEFECTO if os.path.exists(ICONO_DEFECTO) else "system-software-update"
-    try:
-        TRAY_PROCESS = subprocess.Popen(['sudo', '-u', usuario, 'zenity', '--notification', '--listen', f'--window-icon={icono}'],
-                                      env=entorno, stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, text=True)
-        actualizar_tray('inicio', "GuadaMint Iniciando...")
-    except: pass
-
-def actualizar_tray(estado, mensaje=""):
-    global TRAY_PROCESS
-    if not TRAY_PROCESS or TRAY_PROCESS.poll() is not None: return
-    iconos = {'inicio': ICONO_DEFECTO if os.path.exists(ICONO_DEFECTO) else 'preferences-system', 'trabajando': 'system-software-install', 'ok': 'security-high', 'error': 'dialog-error'}
-    try:
-        if mensaje: TRAY_PROCESS.stdin.write(f"message: {mensaje}\n")
-        TRAY_PROCESS.stdin.write(f"icon: {iconos.get(estado, 'info')}\n")
-        TRAY_PROCESS.stdin.flush()
-    except: pass
-
-def cerrar_tray_icon():
-    global TRAY_PROCESS
-    if TRAY_PROCESS:
-        try: TRAY_PROCESS.terminate(); TRAY_PROCESS = None
-        except: pass
-
-def mostrar_aviso(titulo, mensaje, icono="info"):
-    """
-    Muestra una notificación de escritorio (burbuja flotante) en lugar de una ventana invasiva.
-    """
-    usuario = obtener_usuario_real()
-    if not usuario: return
-    entorno = os.environ.copy()
-    entorno.update(obtener_entorno_usuario(usuario))
-    
-    # Seleccionamos el icono para la notificación
-    icono_notif = ICONO_DEFECTO if os.path.exists(ICONO_DEFECTO) else "dialog-information"
-    if icono == "error":
-        icono_notif = "dialog-error"
-        
-    try: 
-        # Utilizamos notify-send para mostrar la burbuja de notificación
-        subprocess.Popen(['sudo', '-u', usuario, 'notify-send', '-a', 'GuadaMint Update', '-i', icono_notif, titulo, mensaje], env=entorno, stderr=subprocess.DEVNULL)
-    except: pass
-
-def detectar_escritorio():
-    if os.path.exists("/usr/bin/cinnamon-session"): return "CINNAMON"
-    if os.path.exists("/usr/bin/xfce4-session"): return "XFCE"
-    return "DESCONOCIDO"
-
-def ejecutar_comando(comando, visible=False):
-    try:
-        env = os.environ.copy(); env['DEBIAN_FRONTEND'] = 'noninteractive'
-        if visible: subprocess.run(comando, text=True, env=env, check=True)
-        else: subprocess.run(comando, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, env=env, check=True)
-        log_y_print(f"OK: {' '.join(comando)}")
-        return True
+        if os.geteuid() == 0: return True
+        gid_list = os.getgroups()
+        for gid in gid_list:
+            nombre = grp.getgrgid(gid).gr_name
+            if nombre == 'sudo' or nombre == 'admin': return True
+        return False
     except: return False
 
-def verificar_crear_usuario_alumno():
-    try: subprocess.run(["id", "-u", "usuario"], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    except:
-        log_y_print(">>> Creando usuario 'usuario'...")
+def elevar_a_root():
+    if os.geteuid() != 0:
+        log("Elevando privilegios con pkexec...")
+        usuario_real = os.environ.get('USER', 'usuario')
+        env = os.environ.copy()
+        if 'XAUTHORITY' not in env:
+            possible_auth = f"/home/{usuario_real}/.Xauthority"
+            if os.path.exists(possible_auth):
+                env['XAUTHORITY'] = possible_auth
+        
+        args = ['pkexec', 'env', f'DISPLAY={env.get("DISPLAY", ":0")}', 
+                f'XAUTHORITY={env.get("XAUTHORITY", "")}', 
+                sys.executable] + sys.argv
         try:
-            subprocess.run(["useradd", "-m", "-s", "/bin/bash", "-c", "Usuario", "-U", "usuario"], check=True)
-            proc = subprocess.Popen(["chpasswd"], stdin=subprocess.PIPE, text=True)
-            proc.communicate(input="usuario:usuario")
-        except: pass
+            os.execvpe('pkexec', args, env)
+        except Exception as e:
+            log(f"Error elevación: {e}")
+            sys.exit(1)
 
-def ocultar_lista_usuarios_login():
+def hay_bloqueo_apt():
+    locks = ["/var/lib/dpkg/lock-frontend", "/var/lib/dpkg/lock"]
+    for lock in locks:
+        if subprocess.run(["fuser", lock], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode == 0:
+            return True
+    return False
+
+# ==============================================================================
+# AUTO-UPDATE
+# ==============================================================================
+def auto_update():
+    if not os.access(SCRIPT_BIN, os.W_OK): return
     try:
-        if not os.path.exists("/etc/lightdm/lightdm.conf.d"): os.makedirs("/etc/lightdm/lightdm.conf.d")
-        with open("/etc/lightdm/lightdm.conf.d/99-guadamint-privacy.conf", 'w') as f:
-            f.write("[Seat:*]\ngreeter-hide-users=true\nallow-guest=false\n")
+        if not os.path.exists(REPO_DIR):
+            subprocess.run(["git", "clone", "-b", REPO_BRANCH, REPO_URL, REPO_DIR], check=True)
+        else:
+            os.chdir(REPO_DIR)
+            subprocess.run(["git", "fetch", "origin"], check=True, stderr=subprocess.DEVNULL)
+            subprocess.run(["git", "reset", "--hard", f"origin/{REPO_BRANCH}"], check=True, stderr=subprocess.DEVNULL)
+        
+        if os.path.exists(SCRIPT_SRC) and os.path.realpath(__file__) != os.path.realpath(SCRIPT_SRC):
+            with open(SCRIPT_SRC, 'rb') as f1, open(SCRIPT_BIN, 'rb') as f2:
+                if f1.read() != f2.read():
+                    log("Actualizando script de la tienda...")
+                    shutil.copy2(SCRIPT_SRC, SCRIPT_BIN)
+                    os.chmod(SCRIPT_BIN, 0o755)
+                    os.execv(sys.executable, [sys.executable] + sys.argv)
     except: pass
 
-def eliminar_mint_welcome():
-    """Elimina los accesos directos y el autoarranque de la bienvenida de Linux Mint"""
-    archivos = [
-        "/usr/share/applications/mintwelcome.desktop",
-        "/etc/xdg/autostart/mintwelcome.desktop"
-    ]
-    for archivo in archivos:
-        if os.path.exists(archivo):
-            try:
-                os.remove(archivo)
-                log_y_print(f">>> Eliminado: {archivo}")
-            except Exception as e:
-                log_y_print(f"!!! Error al eliminar {archivo}: {e}")
-
-def verificar_e_instalar_apps():
-    faltantes = [app for app in APPS_OBLIGATORIAS if subprocess.run(["dpkg", "-s", app], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode != 0]
-    if faltantes:
-        log_y_print(f">>> Faltan {len(faltantes)} apps.")
-        actualizar_tray('trabajando', f"Instalando {len(faltantes)} apps...")
-        mostrar_aviso("Mantenimiento", f"Instalando apps base:\n{', '.join(faltantes)}")
-        ejecutar_comando(['apt-get', 'update'], visible=True)
-        if ejecutar_comando(['apt-get', 'install', '-y'] + faltantes, visible=True):
-            actualizar_tray('ok', "Software actualizado")
-        else: actualizar_tray('error', "Error al instalar")
-    else:
-        log_y_print(">>> Todo en orden.")
-        actualizar_tray('ok', "Sistema listo")
-
 # ==============================================================================
-# MAIN
+# INTERFAZ GRÁFICA
 # ==============================================================================
-def main():
-    if os.geteuid() != 0: sys.exit(1)
-    iniciar_tray_icon()
-    try:
-        auto_actualizar_desde_git()
+class FilaApp(Gtk.ListBoxRow):
+    def __init__(self, app_data, ventana_padre):
+        super().__init__()
+        self.app_data = app_data
+        self.ventana_padre = ventana_padre
+        self.pkg_name = app_data["id"]
+
+        box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
+        box.set_border_width(10)
         
-        escritorio = detectar_escritorio()
-        log_y_print(f">>> Escritorio: {escritorio}")
+        icon = Gtk.Image()
+        icon.set_pixel_size(48)
+        icono_nombre = app_data["icono"]
+        if os.path.isabs(icono_nombre) and os.path.exists(icono_nombre):
+             icon.set_from_file(icono_nombre)
+        elif Gtk.IconTheme.get_default().has_icon(icono_nombre):
+            icon.set_from_icon_name(icono_nombre, Gtk.IconSize.DIALOG)
+        else:
+            icon.set_from_icon_name("system-software-install", Gtk.IconSize.DIALOG)
+        box.pack_start(icon, False, False, 0)
+
+        vbox_text = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
+        lbl_name = Gtk.Label(xalign=0)
+        lbl_name.set_markup(f"<b>{app_data['nombre']}</b>")
+        lbl_desc = Gtk.Label(label=app_data['desc'], xalign=0)
+        lbl_desc.get_style_context().add_class("dim-label")
+        lbl_desc.set_max_width_chars(40)
+        lbl_desc.set_line_wrap(True)
+        vbox_text.pack_start(lbl_name, True, True, 0)
+        vbox_text.pack_start(lbl_desc, True, True, 0)
+        box.pack_start(vbox_text, True, True, 0)
+
+        self.switch = Gtk.Switch()
+        self.switch.set_valign(Gtk.Align.CENTER)
+        self.handler_id = self.switch.connect("state-set", self.on_switch_activated)
         
-        # Mantenimiento
-        verificar_crear_usuario_alumno()
-        ocultar_lista_usuarios_login()
-        eliminar_mint_welcome()
-        verificar_e_instalar_apps()
+        self.spinner = Gtk.Spinner()
         
-        if escritorio == "XFCE": pass
-        elif escritorio == "CINNAMON": pass
+        box.pack_end(self.switch, False, False, 0)
+        box.pack_end(self.spinner, False, False, 10)
         
-        time.sleep(random.randint(5, 10))
+        self.add(box)
+        threading.Thread(target=self.check_installed).start()
+
+    def check_installed(self):
         try:
-            with open(LOCK_FILE, 'w') as f: f.write("running")
-        except: pass
-        if os.path.exists(LOCK_FILE):
-            try: os.remove(LOCK_FILE)
-            except: pass
-    finally:
-        cerrar_tray_icon()
-    log_y_print("=== FIN ===")
+            res = subprocess.run(
+                ["dpkg-query", "-W", "--showformat=${Status}", self.pkg_name], 
+                stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True
+            )
+            is_installed = "install ok installed" in res.stdout
+        except:
+            is_installed = False
+            
+        GLib.idle_add(self.update_switch_state, is_installed)
+
+    def update_switch_state(self, state):
+        self.switch.handler_block(self.handler_id)
+        self.switch.set_active(state)
+        self.switch.handler_unblock(self.handler_id)
+        return False
+
+    def on_switch_activated(self, switch, state):
+        self.switch.set_sensitive(False)
+        self.spinner.start()
+        
+        if hay_bloqueo_apt():
+            self.mostrar_error("Sistema ocupado (APT bloqueado).\nInténtalo en un minuto.")
+            self.spinner.stop()
+            self.switch.set_sensitive(True)
+            self.switch.handler_block(self.handler_id)
+            self.switch.set_active(not state)
+            self.switch.handler_unblock(self.handler_id)
+            return True 
+
+        # Cambiar el estado visualmente al instante para dar feedback al usuario
+        self.switch.set_state(state)
+
+        action = "install" if state else "remove"
+        threading.Thread(target=self.run_apt_action, args=(action,)).start()
+        return True
+
+    def mostrar_error(self, mensaje):
+        dialog = Gtk.MessageDialog(parent=self.ventana_padre, flags=Gtk.DialogFlags.MODAL, message_type=Gtk.MessageType.ERROR, buttons=Gtk.ButtonsType.OK, text="Aviso")
+        dialog.format_secondary_text(mensaje)
+        dialog.run()
+        dialog.destroy()
+
+    def run_apt_action(self, action):
+        log(f"Iniciando acción: {action} {self.pkg_name}")
+        error_msg = ""
+        success = False
+        cmd = []
+        
+        if action == "install" and "script_install" in self.app_data:
+            nombre_script = self.app_data["script_install"]
+            ruta_script = os.path.join(RUTA_SCRIPTS_REPO, nombre_script)
+            if os.path.exists(ruta_script):
+                os.chmod(ruta_script, 0o755)
+                cmd = ["/bin/bash", ruta_script]
+            else:
+                error_msg = f"Script no encontrado: {ruta_script}"
+        else:
+            cmd = ["env", "DEBIAN_FRONTEND=noninteractive", "/usr/bin/apt-get", action, "-y", "-o", "Dpkg::Options::=--force-confdef", "-o", "Dpkg::Options::=--force-confold", self.pkg_name]
+
+        if cmd:
+            try:
+                process = subprocess.Popen(
+                    cmd, 
+                    stdout=subprocess.PIPE, 
+                    stderr=subprocess.STDOUT, 
+                    text=True
+                )
+                
+                full_log = ""
+                for line in process.stdout:
+                    log(f"[APT] {line.strip()}")
+                    full_log += line
+                
+                process.wait()
+                
+                if process.returncode == 0:
+                    success = True
+                    log("Comando APT completado con éxito.")
+                else:
+                    log(f"Error (Código {process.returncode})")
+                    if "Unable to locate" in full_log: error_msg = f"Paquete no encontrado."
+                    elif "lock" in full_log: error_msg = "Bloqueo APT."
+                    else: error_msg = "Error en la ejecución. Ver logs."
+            except Exception as e:
+                log(f"Excepción Python: {e}")
+                error_msg = str(e)
+
+        # Validación final real con dpkg-query para evitar falsos positivos
+        try:
+            res = subprocess.run(
+                ["dpkg-query", "-W", "--showformat=${Status}", self.pkg_name], 
+                stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True
+            )
+            actual_state = "install ok installed" in res.stdout
+        except:
+            actual_state = False
+            
+        intended = (action == "install")
+        if success and (actual_state != intended):
+            log(f"AVISO: apt-get terminó bien, pero {self.pkg_name} no quedó en estado {action}. Revirtiendo.")
+            success = False
+            if not error_msg: error_msg = "El paquete no se instaló/desinstaló correctamente."
+
+        GLib.idle_add(self.finish_action, success, intended, error_msg)
+
+    def finish_action(self, success, intended_state, error_msg=""):
+        self.spinner.stop()
+        self.switch.set_sensitive(True)
+        
+        if success:
+            user = os.environ.get('SUDO_USER', os.environ.get('USER'))
+            subprocess.Popen(['sudo', '-u', user, 'notify-send', '-i', 'system-software-update', 'GuadaMint Store', f'Operación completada: {self.app_data["nombre"]}'])
+        else:
+            self.switch.handler_block(self.handler_id)
+            self.switch.set_active(not intended_state)
+            self.switch.handler_unblock(self.handler_id)
+            
+            if error_msg: self.mostrar_error(error_msg)
+            else: self.mostrar_error("Operación fallida. Revise los logs.")
+        
+        return False
+
+class GuadaStoreWindow(Gtk.Window):
+    def __init__(self):
+        super().__init__(title=TITULO_APP)
+        self.set_default_size(600, 700)
+        self.set_border_width(0)
+        if os.path.exists(ICONO_APP): self.set_icon_from_file(ICONO_APP)
+
+        header = Gtk.HeaderBar()
+        header.set_show_close_button(True)
+        header.set_title(TITULO_APP)
+        header.set_subtitle("Instalador de Software Escolar (Modo Admin)")
+        self.set_titlebar(header)
+        
+        btn_refresh = Gtk.Button()
+        icon_refresh = Gtk.Image.new_from_icon_name("view-refresh-symbolic", Gtk.IconSize.BUTTON)
+        btn_refresh.add(icon_refresh)
+        btn_refresh.connect("clicked", self.refresh_all)
+        header.pack_start(btn_refresh)
+
+        scrolled = Gtk.ScrolledWindow()
+        scrolled.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
+        self.add(scrolled)
+
+        self.main_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
+        self.main_box.set_border_width(15)
+        scrolled.add(self.main_box)
+
+        self.rows = []
+        for seccion in CATALOGO:
+            lbl_sec = Gtk.Label(label=seccion["categoria"], xalign=0)
+            lbl_sec.get_style_context().add_class("h3")
+            lbl_sec.set_margin_top(15)
+            lbl_sec.set_margin_bottom(5)
+            self.main_box.pack_start(lbl_sec, False, False, 0)
+            
+            listbox = Gtk.ListBox()
+            listbox.set_selection_mode(Gtk.SelectionMode.NONE)
+            listbox.get_style_context().add_class("frame") 
+            
+            for app in seccion["apps"]:
+                row = FilaApp(app, self)
+                listbox.add(row)
+                self.rows.append(row)
+            
+            self.main_box.pack_start(listbox, False, False, 0)
+
+    def refresh_all(self, widget):
+        for row in self.rows:
+            threading.Thread(target=row.check_installed).start()
+
+def main():
+    if not es_administrador():
+        dialog = Gtk.MessageDialog(parent=None, flags=Gtk.DialogFlags.MODAL, message_type=Gtk.MessageType.ERROR, buttons=Gtk.ButtonsType.OK, text="Acceso Restringido")
+        dialog.format_secondary_text("Esta aplicación es solo para administradores.\n\nContacte con su administrador/a TDE para instalar aplicaciones.")
+        dialog.set_title("GuadaMint Store")
+        if os.path.exists(ICONO_APP): dialog.set_icon_from_file(ICONO_APP)
+        dialog.run()
+        dialog.destroy()
+        sys.exit(0)
+
+    elevar_a_root()
+    try: auto_update()
+    except: pass
+    
+    win = GuadaStoreWindow()
+    win.connect("destroy", Gtk.main_quit)
+    win.show_all()
+    Gtk.main()
 
 if __name__ == "__main__":
     main()
