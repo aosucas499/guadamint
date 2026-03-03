@@ -63,6 +63,7 @@ def auto_actualizar_desde_git():
     log_y_print(f"--- Comprobando actualizaciones del repositorio (Rama: {REPO_BRANCH}) ---")
     
     hay_cambios_git = False
+    mensaje_git = ""
     
     # 1. Clonar o Actualizar el Repositorio en /opt
     if not os.path.exists(REPO_DIR):
@@ -70,8 +71,10 @@ def auto_actualizar_desde_git():
         try:
             subprocess.run(["git", "clone", "-b", REPO_BRANCH, REPO_URL, REPO_DIR], check=True)
             hay_cambios_git = True
+            mensaje_git = "Se ha descargado el repositorio por primera vez con éxito."
         except Exception as e:
             log_y_print(f"!!! Error al clonar: {e}")
+            mostrar_aviso("Error de Actualización", f"No se pudo descargar de GitHub:\n{e}", "error")
             return 
     else:
         try:
@@ -84,12 +87,28 @@ def auto_actualizar_desde_git():
             
             if local_hash != remote_hash:
                 log_y_print(f">>> Git: Actualización detectada ({local_hash[:7]} -> {remote_hash[:7]})")
+                
+                # Intentamos capturar qué commits son nuevos para enseñarlos en el aviso
+                try:
+                    resumen = subprocess.check_output(["git", "log", "--oneline", f"{local_hash}..{remote_hash}"], text=True).strip()
+                except:
+                    resumen = "Nuevos archivos actualizados en el código fuente."
+                    
                 subprocess.run(["git", "reset", "--hard", f"origin/{REPO_BRANCH}"], check=True)
                 hay_cambios_git = True
+                mensaje_git = f"Se han descargado nuevos cambios desde GitHub con éxito.\n\nResumen de actualizaciones:\n{resumen}"
             else:
                 log_y_print(">>> Git: El repositorio está al día.")
         except Exception as e:
             log_y_print(f"!!! Error git: {e}")
+            mostrar_aviso("Error de Actualización", f"Fallo al comprobar GitHub:\n{e}", "error")
+            return
+
+    # --- AVISO GRÁFICO DEL ESTADO DE GITHUB ---
+    if hay_cambios_git:
+        mostrar_aviso("¡GuadaMint Actualizado!", mensaje_git)
+    else:
+        mostrar_aviso("Estado de Actualización", "Todo está al día.\n\nNo se han encontrado cambios nuevos en el repositorio de GuadaMint.")
 
     # 2. Sincronizar archivos al sistema
     se_requiere_reinicio = False
