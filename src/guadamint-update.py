@@ -89,7 +89,8 @@ def auto_actualizar_desde_git():
                 
                 # Capturamos el resumen limitando a 3 líneas para que quepa bien en la notificación
                 try:
-                    resumen_completo = subprocess.check_output(["git", "log", "--oneline", f"{local_hash}..{remote_hash}"], text=True).strip()
+                    # Usamos --pretty=format:"• %s" para quitar el hash (números) y dejar solo el texto del mensaje
+                    resumen_completo = subprocess.check_output(["git", "log", "--pretty=format:• %s", f"{local_hash}..{remote_hash}"], text=True).strip()
                     lineas = resumen_completo.split('\n')
                     if len(lineas) > 3:
                         resumen = '\n'.join(lineas[:3]) + '\n... y más cambios.'
