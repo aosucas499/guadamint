@@ -9,6 +9,8 @@
 #modificar el plymouth o grub desactivando los valores quiet splash por quiet. De esta manera quitamos el logo de linux mint en el boot.
 
 # Para desactivar las aplicaciones de inicio de linux mint buscamos en /etc/xdg/autostart y /usr/share/applications y borramos: mintwelcome
+sudo rm /usr/share/applications/mintwelcome.desktop
+sudo rm /etc/xdg/autostart/mintwelcome.desktop
 
 # Para la pantalla de inicio de usuarios, se cambia en la aplicación ventana de inicio de sesion.
 
