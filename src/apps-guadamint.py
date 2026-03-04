@@ -82,6 +82,7 @@ CATALOGO = [
         "categoria": "Utilidades y Navegadores",
         "apps": [
             {"id": "google-chrome-stable", "nombre": "Google Chrome", "desc": "Navegador oficial Google", "icono": "google-chrome", "script_install": "instalar_chrome.sh"},
+            {"id": "smart-product-drivers", "nombre": "Drivers SMART Board", "desc": "Controladores para pizarras", "icono": "video-display", "script_install": "instalar_smartboard.sh"},
             {"id": "gnome-network-displays", "nombre": "Pantallas Wifi", "desc": "Proyección inalámbrica", "icono": "preferences-desktop-display"},
             {"id": "vlc", "nombre": "VLC", "desc": "Reproductor multimedia", "icono": "vlc"},
             {"id": "chromium-browser", "nombre": "Chromium", "desc": "Navegador libre", "icono": "chromium-browser"},
