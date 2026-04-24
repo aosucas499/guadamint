@@ -1,26 +1,53 @@
 #!/bin/bash
-# Script de instalación para Drivers SMART Board (Ubuntu 20)
-# Ejecutado por apps-guadamint.py (ya tiene permisos de root)
 
-echo "=== Descargando clave de SMART Technologies ==="
-wget -q https://downloads.smarttech.com/software/linux/nb-for-ubuntu-20/dists/swbuild.asc -O /tmp/swbuild.asc
+# Colores para la terminal
+AZUL="\033[1;34m"
+VERDE="\033[1;32m"
+NORMAL="\033[0m"
 
-echo "=== Añadiendo clave de seguridad ==="
-apt-key add /tmp/swbuild.asc
+# 1. Detectar la distribución actual
+DISTRO=$(lsb_release -cs)
 
-echo "=== Añadiendo repositorio temporal ==="
-echo "deb http://downloads01.smarttech.com/software/linux/nb-for-ubuntu-20 stable non-free" > /etc/apt/sources.list.d/smartboard.list
+echo -e "${AZUL}====================================================${NORMAL}"
+echo -e "${AZUL}   INSTALADOR SMARTBOARD PARA GUADAMINT / UBUNTU    ${NORMAL}"
+echo -e "${AZUL}====================================================${NORMAL}"
 
-echo "=== Actualizando lista de paquetes ==="
-apt-get update -y
+# 2. Definir la función de instalación
+function installSmartdre {
+    echo -e "${VERDE}Preparando descarga desde el repositorio...${NORMAL}"
+    
+    # Limpiamos instalaciones previas del repositorio para evitar errores de git
+    if [ -d "smartdre" ]; then
+        echo "Eliminando carpeta smartdre temporal existente..."
+        sudo rm -rf smartdre
+    fi
 
-echo "=== Instalando drivers de la Pizarra SMART ==="
-apt-get install -y smart-product-drivers smart-notebook
-apt-get install -f -y
+    # Clonar el repositorio
+    git clone https://github.com/aosucas499/smartdre.git
+    
+    # Entrar y ejecutar el instalador específico para Noble
+    cd smartdre || { echo "Error: No se pudo acceder a la carpeta"; exit 1; }
+    
+    echo -e "${VERDE}Ejecutando install-noble...${NORMAL}"
+    chmod +x install-noble
+    ./install-noble
+    
+    # Volver atrás
+    cd ..
+}
 
-echo "=== Limpiando repositorio temporal ==="
-# Borramos el repo para evitar errores de actualización en el futuro
-rm /etc/apt/sources.list.d/smartboard.list
-rm /tmp/swbuild.asc
+# 3. Lógica de detección de versiones para informar al usuario
+if [[ $DISTRO == w* || $DISTRO == "noble" ]]; then
+    echo -e "Sistema detectado: ${VERDE}Base Noble (Ubuntu 24.04 / Mint serie 22)${NORMAL}"
+elif [[ $DISTRO =~ ^(jammy|victoria|virginia)$ ]]; then
+    echo -e "Sistema detectado: ${VERDE}Base Jammy (Ubuntu 22.04 / Mint serie 21)${NORMAL}"
+else
+    echo -e "Sistema detectado: ${AZUL}$DISTRO${NORMAL}"
+fi
 
-echo "=== Instalación de SMART Board completada ==="
+# 4. Ejecutar la función
+installSmartdre
+
+echo -e "${AZUL}====================================================${NORMAL}"
+echo -e "${VERDE}PROCESO FINALIZADO${NORMAL}"
+echo -e "${AZUL}====================================================${NORMAL}"
