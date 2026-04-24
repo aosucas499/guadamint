@@ -5,14 +5,11 @@ AZUL="\033[1;34m"
 VERDE="\033[1;32m"
 NORMAL="\033[0m"
 
-# 1. Detectar la distribución actual
-DISTRO=$(lsb_release -cs)
-
 echo -e "${AZUL}====================================================${NORMAL}"
 echo -e "${AZUL}   INSTALADOR SMARTBOARD PARA GUADAMINT / UBUNTU    ${NORMAL}"
 echo -e "${AZUL}====================================================${NORMAL}"
 
-# 2. Definir la función de instalación
+# 1. Definir la función de instalación
 function installSmartdre {
     echo -e "${VERDE}Preparando descarga desde el repositorio...${NORMAL}"
     
@@ -36,10 +33,10 @@ function installSmartdre {
     cd ..
 }
 
-# 4. Ejecutar la función
+# 2. Ejecutar la función
 installSmartdre
 
-5. Borrar la carpeta para que si falla o actualizamos el codigo la descargue otra vez en el próximo intento
+# 3. Borrar la carpeta para que si falla o actualizamos el codigo la descargue otra vez en el próximo intento
 rm -r /opt/guadamint/smartdre
 
 echo -e "${AZUL}====================================================${NORMAL}"
