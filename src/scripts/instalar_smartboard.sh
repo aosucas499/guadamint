@@ -36,15 +36,6 @@ function installSmartdre {
     cd ..
 }
 
-# 3. Lógica de detección de versiones para informar al usuario
-if [[ $DISTRO == w* || $DISTRO == "noble" ]]; then
-    echo -e "Sistema detectado: ${VERDE}Base Noble (Ubuntu 24.04 / Mint serie 22)${NORMAL}"
-elif [[ $DISTRO =~ ^(jammy|victoria|virginia)$ ]]; then
-    echo -e "Sistema detectado: ${VERDE}Base Jammy (Ubuntu 22.04 / Mint serie 21)${NORMAL}"
-else
-    echo -e "Sistema detectado: ${AZUL}$DISTRO${NORMAL}"
-fi
-
 # 4. Ejecutar la función
 installSmartdre
 
