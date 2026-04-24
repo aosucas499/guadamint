@@ -39,6 +39,9 @@ function installSmartdre {
 # 4. Ejecutar la función
 installSmartdre
 
+5. Borrar la carpeta para que si falla o actualizamos el codigo la descargue otra vez en el próximo intento
+rm -r /opt/guadamint/smartdre
+
 echo -e "${AZUL}====================================================${NORMAL}"
 echo -e "${VERDE}PROCESO FINALIZADO${NORMAL}"
 echo -e "${AZUL}====================================================${NORMAL}"
