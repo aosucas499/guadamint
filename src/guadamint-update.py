@@ -34,11 +34,9 @@ ARCHIVOS_A_SINCRONIZAR = [
 
 SCRIPT_BIN_PATH = "/usr/bin/guadamint-update.py"
 
-# LISTA DE APPS OBLIGATORIAS (SISTEMA BASE)
+# LISTA DE HERRAMIENTAS BASE OBLIGATORIAS
 APPS_OBLIGATORIAS = [
-    "zram-tools",  # Optimización de RAM
-    "openboard",    # Pizarra digital
-     "screen"       # Multiplexor de terminal
+    "git"  # Sistema de control de versiones necesario para la auto-actualización
 ]
 
 logging.basicConfig(filename=LOG_FILE, level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -90,9 +88,7 @@ def auto_actualizar_desde_git():
             if local_hash != remote_hash:
                 log_y_print(f">>> Git: Actualización detectada ({local_hash[:7]} -> {remote_hash[:7]})")
                 
-                # Capturamos el resumen limitando a 3 líneas para que quepa bien en la notificación
                 try:
-                    # Usamos --pretty=format:"• %s" para quitar el hash (números) y dejar solo el texto del mensaje
                     resumen_completo = subprocess.check_output(["git", "log", "--pretty=format:• %s", f"{local_hash}..{remote_hash}"], text=True).strip()
                     lineas = resumen_completo.split('\n')
                     if len(lineas) > 3:
@@ -116,7 +112,6 @@ def auto_actualizar_desde_git():
     if hay_cambios_git:
         mostrar_aviso("GuadaMint Actualizado", mensaje_git)
     elif not es_reinicio:
-        # Solo mostramos que está al día si NO venimos de un reinicio automático
         mostrar_aviso("Sistema al día", "No hay actualizaciones nuevas.")
 
     # 2. Sincronizar archivos al sistema
@@ -148,7 +143,6 @@ def auto_actualizar_desde_git():
         try:
             if TRAY_PROCESS: cerrar_tray_icon()
             time.sleep(1)
-            # Añadimos la "palabra secreta" --restarted para que la próxima ejecución sea silenciosa
             argumentos = sys.argv[:]
             if '--restarted' not in argumentos:
                 argumentos.append('--restarted')
@@ -206,25 +200,21 @@ def cerrar_tray_icon():
         except: pass
 
 def mostrar_aviso(titulo, mensaje, icono="info"):
-    """
-    Muestra una notificación de escritorio (burbuja flotante) en lugar de una ventana invasiva.
-    """
     usuario = obtener_usuario_real()
     if not usuario: return
     entorno = os.environ.copy()
     entorno.update(obtener_entorno_usuario(usuario))
     
-    # Seleccionamos el icono para la notificación
     icono_notif = ICONO_DEFECTO if os.path.exists(ICONO_DEFECTO) else "dialog-information"
     if icono == "error":
         icono_notif = "dialog-error"
         
     try: 
-        # Utilizamos notify-send para mostrar la burbuja de notificación
         subprocess.Popen(['sudo', '-u', usuario, 'notify-send', '-a', 'GuadaMint Update', '-i', icono_notif, titulo, mensaje], env=entorno, stderr=subprocess.DEVNULL)
     except: pass
 
 def detectar_escritorio():
+    if os.path.exists("/usr/bin/gnome-shell"): return "GNOME"
     if os.path.exists("/usr/bin/cinnamon-session"): return "CINNAMON"
     if os.path.exists("/usr/bin/xfce4-session"): return "XFCE"
     return "DESCONOCIDO"
@@ -238,43 +228,12 @@ def ejecutar_comando(comando, visible=False):
         return True
     except: return False
 
-def verificar_crear_usuario_alumno():
-    try: subprocess.run(["id", "-u", "usuario"], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    except:
-        log_y_print(">>> Creando usuario 'usuario'...")
-        try:
-            subprocess.run(["useradd", "-m", "-s", "/bin/bash", "-c", "Usuario", "-U", "usuario"], check=True)
-            proc = subprocess.Popen(["chpasswd"], stdin=subprocess.PIPE, text=True)
-            proc.communicate(input="usuario:usuario")
-        except: pass
-
-def ocultar_lista_usuarios_login():
-    try:
-        if not os.path.exists("/etc/lightdm/lightdm.conf.d"): os.makedirs("/etc/lightdm/lightdm.conf.d")
-        with open("/etc/lightdm/lightdm.conf.d/99-guadamint-privacy.conf", 'w') as f:
-            f.write("[Seat:*]\ngreeter-hide-users=true\nallow-guest=false\n")
-    except: pass
-
-def eliminar_mint_welcome():
-    """Elimina los accesos directos y el autoarranque de la bienvenida de Linux Mint"""
-    archivos = [
-        "/usr/share/applications/mintwelcome.desktop",
-        "/etc/xdg/autostart/mintwelcome.desktop"
-    ]
-    for archivo in archivos:
-        if os.path.exists(archivo):
-            try:
-                os.remove(archivo)
-                log_y_print(f">>> Eliminado: {archivo}")
-            except Exception as e:
-                log_y_print(f"!!! Error al eliminar {archivo}: {e}")
-
 def verificar_e_instalar_apps():
     faltantes = [app for app in APPS_OBLIGATORIAS if subprocess.run(["dpkg", "-s", app], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode != 0]
     if faltantes:
-        log_y_print(f">>> Faltan {len(faltantes)} apps.")
-        actualizar_tray('trabajando', f"Instalando {len(faltantes)} apps...")
-        mostrar_aviso("Mantenimiento", f"Instalando apps base:\n{', '.join(faltantes)}")
+        log_y_print(f">>> Faltan {len(faltantes)} herramientas base.")
+        actualizar_tray('trabajando', f"Instalando {len(faltantes)} herramienta...")
+        mostrar_aviso("Mantenimiento", f"Instalando herramientas base:\n{', '.join(faltantes)}")
         ejecutar_comando(['apt-get', 'update'], visible=True)
         if ejecutar_comando(['apt-get', 'install', '-y'] + faltantes, visible=True):
             actualizar_tray('ok', "Software actualizado")
@@ -295,14 +254,8 @@ def main():
         escritorio = detectar_escritorio()
         log_y_print(f">>> Escritorio: {escritorio}")
         
-        # Mantenimiento
-        verificar_crear_usuario_alumno()
-        ocultar_lista_usuarios_login()
-        eliminar_mint_welcome()
+        # Mantenimiento básico
         verificar_e_instalar_apps()
-        
-        if escritorio == "XFCE": pass
-        elif escritorio == "CINNAMON": pass
         
         time.sleep(random.randint(5, 10))
         try:

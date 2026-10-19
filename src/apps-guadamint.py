@@ -31,61 +31,15 @@ if os.geteuid() == 0 and not os.path.exists(os.path.dirname(LOG_FILE)):
 # --- CATÁLOGO DE APLICACIONES ---
 CATALOGO = [
     {
-        "categoria": "Educación Infantil y Primaria",
+        "categoria": "Aplicaciones de Ejemplo",
         "apps": [
-            {"id": "gcompris-qt", "nombre": "GCompris", "desc": "Suite educativa (2-10 años)", "icono": "gcompris-qt"},
-            {"id": "tuxtype", "nombre": "Tux Typing", "desc": "Mecanografía infantil", "icono": "tuxtype"},
-            {"id": "tuxmath", "nombre": "Tux Math", "desc": "Matemáticas arcade", "icono": "tuxmath"},
-            {"id": "tuxpaint", "nombre": "Tux Paint", "desc": "Dibujo para niños", "icono": "tuxpaint"},
-            {"id": "kanagram", "nombre": "Kanagram", "desc": "Anagramas y vocabulario", "icono": "kanagram"},
-            {"id": "khangman", "nombre": "KHangMan", "desc": "Juego del ahorcado", "icono": "khangman"},
+            {"id": "vlc", "nombre": "VLC Media Player", "desc": "Reproductor multimedia de ejemplo", "icono": "vlc"},
         ]
     },
     {
-        "categoria": "Educación Secundaria y Bachillerato",
+        "categoria": "Hardware y Controladores",
         "apps": [
-            {"id": "geogebra", "nombre": "GeoGebra", "desc": "Matemáticas dinámicas", "icono": "geogebra"},
-            {"id": "stellarium", "nombre": "Stellarium", "desc": "Planetario virtual", "icono": "stellarium"},
-            {"id": "kalzium", "nombre": "Kalzium", "desc": "Tabla periódica", "icono": "kalzium"},
-            {"id": "step", "nombre": "Step", "desc": "Simulador físico", "icono": "step"},
-            {"id": "marble", "nombre": "Marble", "desc": "Globo terráqueo virtual", "icono": "marble"},
-            {"id": "kgeography", "nombre": "KGeography", "desc": "Geografía mundial", "icono": "kgeography"},
-            {"id": "kwordquiz", "nombre": "KWordQuiz", "desc": "Tarjetas de vocabulario", "icono": "kwordquiz"},
-            {"id": "celestia", "nombre": "Celestia", "desc": "Simulador espacial 3D", "icono": "celestia"},
-            {"id": "klavaro", "nombre": "Klavaro", "desc": "Curso de mecanografía", "icono": "klavaro"},
-            {"id": "gbrainy", "nombre": "GBrainy", "desc": "Juegos de lógica", "icono": "gbrainy"},
-        ]
-    },
-    {
-        "categoria": "Programación y Robótica",
-        "apps": [
-            {"id": "scratch", "nombre": "Scratch", "desc": "Programación visual", "icono": "scratch"},
-            {"id": "kturtle", "nombre": "KTurtle", "desc": "Programación Logo", "icono": "kturtle"},
-            {"id": "thonny", "nombre": "Thonny", "desc": "Python para principiantes", "icono": "thonny"},
-            {"id": "minetest", "nombre": "Minetest", "desc": "Mundo abierto (Minecraft libre)", "icono": "minetest"},
-            {"id": "fritzing", "nombre": "Fritzing", "desc": "Diseño de circuitos", "icono": "fritzing"},
-            {"id": "arduino", "nombre": "Arduino IDE", "desc": "Programación Arduino", "icono": "arduino"},
-        ]
-    },
-    {
-        "categoria": "Creatividad y Multimedia",
-        "apps": [
-            {"id": "audacity", "nombre": "Audacity", "desc": "Editor de audio", "icono": "audacity"},
-            {"id": "inkscape", "nombre": "Inkscape", "desc": "Diseño vectorial", "icono": "inkscape"},
-            {"id": "blender", "nombre": "Blender", "desc": "Animación 3D", "icono": "blender"},
-            {"id": "kdenlive", "nombre": "Kdenlive", "desc": "Editor de vídeo", "icono": "kdenlive"},
-            {"id": "obs-studio", "nombre": "OBS Studio", "desc": "Grabación de pantalla", "icono": "obs"},
-            {"id": "lmms", "nombre": "LMMS", "desc": "Producción musical", "icono": "lmms"},
-        ]
-    },
-    {
-        "categoria": "Utilidades y Navegadores",
-        "apps": [
-            {"id": "google-chrome-stable", "nombre": "Google Chrome", "desc": "Navegador oficial Google", "icono": "google-chrome", "script_install": "instalar_chrome.sh"},
-            {"id": "smart-product-drivers", "nombre": "Drivers SMART Board", "desc": "Controladores para pizarras", "icono": "video-display", "script_install": "instalar_smartboard.sh"},
-            {"id": "gnome-network-displays", "nombre": "Pantallas Wifi", "desc": "Proyección inalámbrica", "icono": "preferences-desktop-display"},
-            {"id": "vlc", "nombre": "VLC", "desc": "Reproductor multimedia", "icono": "vlc"},
-            {"id": "chromium-browser", "nombre": "Chromium", "desc": "Navegador libre", "icono": "chromium-browser"},
+            {"id": "smart-product-drivers", "nombre": "Drivers SMART Board", "desc": "Controladores para pizarras interactivas", "icono": "video-display", "script_install": "instalar_smartboard.sh"},
         ]
     }
 ]
@@ -103,9 +57,7 @@ RUTA_SCRIPTS_REPO = "/opt/guadamint/src/scripts"
 # ==============================================================================
 def log(msg):
     try:
-        # Añadimos print para que se vea en la terminal si se lanza con Terminal=true
         print(msg)
-        
         timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         with open(LOG_FILE, "a") as f:
             f.write(f"[{timestamp}] {msg}\n")
@@ -120,7 +72,7 @@ def es_administrador():
         gid_list = os.getgroups()
         for gid in gid_list:
             nombre = grp.getgrgid(gid).gr_name
-            if nombre == 'sudo' or nombre == 'admin': return True
+            if nombre == 'sudo' or nombre == 'admin' or nombre == 'tde': return True
         return False
     except: return False
 
@@ -250,7 +202,6 @@ class FilaApp(Gtk.ListBoxRow):
             self.switch.handler_unblock(self.handler_id)
             return True 
 
-        # Cambiar el estado visualmente al instante para dar feedback al usuario
         self.switch.set_state(state)
 
         action = "install" if state else "remove"
@@ -308,7 +259,6 @@ class FilaApp(Gtk.ListBoxRow):
                 log(f"Excepción Python: {e}")
                 error_msg = str(e)
 
-        # Validación final real con dpkg-query para evitar falsos positivos
         try:
             res = subprocess.run(
                 ["dpkg-query", "-W", "--showformat=${Status}", self.pkg_name], 
