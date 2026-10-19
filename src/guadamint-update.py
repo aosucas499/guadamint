@@ -18,7 +18,7 @@ ICONO_DEFECTO = "/usr/share/icons/guadamintuz.svg"
 # --- CONFIGURACIÓN GIT ---
 REPO_URL = "https://github.com/aosucas499/guadamint.git"
 REPO_DIR = "/opt/guadamint"
-REPO_BRANCH = "main" 
+REPO_BRANCH = "eos" 
 
 # --- ARCHIVOS QUE SE DEBEN ACTUALIZAR DESDE GITHUB ---
 ARCHIVOS_A_SINCRONIZAR = [
