@@ -47,7 +47,7 @@ CATALOGO = [
 # --- AUTO-UPDATE CONFIG ---
 REPO_DIR = "/opt/guadamint"
 REPO_URL = "https://github.com/aosucas499/guadamint.git"
-REPO_BRANCH = "main"
+REPO_BRANCH = "eos"
 SCRIPT_SRC = os.path.join(REPO_DIR, "src/apps-guadamint.py")
 SCRIPT_BIN = "/usr/bin/apps-guadamint.py"
 RUTA_SCRIPTS_REPO = "/opt/guadamint/src/scripts"
