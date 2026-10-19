@@ -155,19 +155,31 @@ def auto_actualizar_desde_git():
 # ==============================================================================
 
 def obtener_entorno_usuario(usuario):
+    """
+    Obtiene las variables de entorno necesarias para mostrar
+    notificaciones en GNOME / EducaAndOS v2.
+    """
     env_vars = {'DISPLAY': ':0'}
     try:
-        pids = subprocess.check_output(["pgrep", "-u", usuario, "-f", "session"], text=True).split()
+        # Obtener el UID numérico del usuario (ej: 1000)
+        uid = subprocess.check_output(["id", "-u", usuario], text=True).strip()
+        env_vars['XDG_RUNTIME_DIR'] = f"/run/user/{uid}"
+        env_vars['DBUS_SESSION_BUS_ADDRESS'] = f"unix:path=/run/user/{uid}/bus"
+        
+        # Intentar obtener DISPLAY real por si es diferente de :0
+        pids = subprocess.check_output(["pgrep", "-u", usuario, "-f", "gnome-session|gnome-shell|session"], text=True).split()
         for pid in pids:
             try:
-                with open(f"/proc/{pid}/environ", "rb") as f: content = f.read().decode("utf-8", errors="ignore")
+                with open(f"/proc/{pid}/environ", "rb") as f:
+                    content = f.read().decode("utf-8", errors="ignore")
                 for item in content.split('\0'):
-                    if item.startswith("DBUS") or item.startswith("DISPLAY"):
-                        k, v = item.split("=", 1)
-                        env_vars[k] = v
-                if 'DBUS_SESSION_BUS_ADDRESS' in env_vars: break
-            except: continue
-    except: pass
+                    if item.startswith("DISPLAY="):
+                        env_vars['DISPLAY'] = item.split("=", 1)[1]
+                        break
+            except:
+                continue
+    except Exception as e:
+        pass
     return env_vars
 
 def iniciar_tray_icon():
@@ -200,8 +212,17 @@ def cerrar_tray_icon():
         except: pass
 
 def mostrar_aviso(titulo, mensaje, icono="info"):
+    """
+    Muestra una notificación flotante compatible con GNOME en EOS v2.
+    """
     usuario = obtener_usuario_real()
-    if not usuario: return
+    if not usuario or usuario == 'root':
+        # Si no hay SUDO_USER, intentamos detectar qué usuario tiene la sesión gráfica activa
+        try:
+            usuario = subprocess.check_output(["loginctl", "list-sessions"], text=True).split("\n")[1].split()[2]
+        except:
+            usuario = "administrador"
+
     entorno = os.environ.copy()
     entorno.update(obtener_entorno_usuario(usuario))
     
@@ -210,9 +231,18 @@ def mostrar_aviso(titulo, mensaje, icono="info"):
         icono_notif = "dialog-error"
         
     try: 
-        subprocess.Popen(['sudo', '-u', usuario, 'notify-send', '-a', 'GuadaMint Update', '-i', icono_notif, titulo, mensaje], env=entorno, stderr=subprocess.DEVNULL)
-    except: pass
-
+        # Invocamos notify-send con las variables de entorno de la sesión gráfica de GNOME
+        subprocess.Popen(
+            ['sudo', '-u', usuario, 'env', 
+             f"DISPLAY={entorno.get('DISPLAY', ':0')}", 
+             f"DBUS_SESSION_BUS_ADDRESS={entorno.get('DBUS_SESSION_BUS_ADDRESS', '')}", 
+             f"XDG_RUNTIME_DIR={entorno.get('XDG_RUNTIME_DIR', '')}", 
+             'notify-send', '-a', 'GuadaMint', '-i', icono_notif, titulo, mensaje],
+            stderr=subprocess.DEVNULL
+        )
+    except Exception as e:
+        log_y_print(f"!!! Error enviando notificación: {e}")
+        
 def detectar_escritorio():
     if os.path.exists("/usr/bin/gnome-shell"): return "GNOME"
     if os.path.exists("/usr/bin/cinnamon-session"): return "CINNAMON"
