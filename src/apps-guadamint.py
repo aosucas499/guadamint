@@ -31,9 +31,10 @@ if os.geteuid() == 0 and not os.path.exists(os.path.dirname(LOG_FILE)):
 # --- CATÁLOGO DE APLICACIONES ---
 CATALOGO = [
     {
-        "categoria": "Aplicaciones de Ejemplo",
+        "categoria": "Aplicaciones Obligatorias",
         "apps": [
             {"id": "vlc", "nombre": "VLC Media Player", "desc": "Reproductor multimedia de ejemplo", "icono": "vlc"},
+             {"id": "openboard", "nombre": "Openboard", "desc": "Aplicación de pizarra interactiva", "icono": "openboard"},
         ]
     },
     {
