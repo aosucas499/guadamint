@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Conmutador de Actualizaciones GuadaMint
+Comment=Permite activar o desactivar las actualizaciones automáticas del sistema
+Exec=/usr/bin/guadamint-toggle-updates.py
+Icon=software-update-available
+Terminal=false
+Categories=System;
+X-GNOME-Autostart-enabled=true
