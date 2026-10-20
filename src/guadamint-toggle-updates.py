@@ -45,12 +45,12 @@ class UpdateSwitchApp:
 
     def is_updates_enabled(self):
         """
-        Las actualizaciones están ACTIVADAS si existe el ejecutable 
-        y no existe la marca de bloqueo global.
+        Las actualizaciones están ACTIVADAS si no existe la marca de bloqueo
+        y existe el archivo/enlace en EXEC_PATH.
         """
         if os.path.exists(LOCK_DISABLE):
             return False
-        return os.path.exists(EXEC_PATH)
+        return os.path.exists(EXEC_PATH) or os.path.islink(EXEC_PATH)
 
     def notify_user(self, title, message, icon="dialog-information"):
         try:
@@ -85,36 +85,34 @@ class UpdateSwitchApp:
         current_state = self.is_updates_enabled()
         
         if current_state:
-            # Comando de desactivación: crea bandera, mata procesos y renombra el binario
+            # Desactivar: borra procesos, crea flag y fuerza mover con -e (cubre enlaces simbólicos)
             sys_cmd = (
                 f"mkdir -p /etc/guadamint && "
                 f"touch {LOCK_DISABLE} && "
                 f"pkill -9 -f sar-educaandos- || true; "
                 f"pkill -9 -f guadamint-update || true; "
-                f"if [ -f {EXEC_PATH} ]; then mv -f {EXEC_PATH} {BACKUP_PATH}; fi"
+                f"if [ -e {EXEC_PATH} ] || [ -L {EXEC_PATH} ]; then mv -f {EXEC_PATH} {BACKUP_PATH}; fi"
             )
             msg_title = "Actualizaciones Desactivadas"
-            msg_body = "Se ha detenido el servicio y deshabilitado el ejecutable."
+            msg_body = "Se ha detenido el servicio y movido el ejecutable a .backup."
             icon_name = "process-stop"
         else:
-            # Comando de activación: elimina bandera y restaura el binario
+            # Activar: elimina marca de bloqueo y restaura el ejecutable
             sys_cmd = (
                 f"rm -f {LOCK_DISABLE} && "
-                f"if [ -f {BACKUP_PATH} ]; then mv -f {BACKUP_PATH} {EXEC_PATH}; fi"
+                f"if [ -e {BACKUP_PATH} ] || [ -L {BACKUP_PATH} ]; then mv -f {BACKUP_PATH} {EXEC_PATH}; fi"
             )
             msg_title = "Actualizaciones Activadas"
-            msg_body = "Se ha restaurado el actualizador del sistema."
+            msg_body = "Se ha restaurado el ejecutable de actualizaciones."
             icon_name = "security-high"
 
-        # Ejecutamos pkexec de forma síncrona
         try:
             res = subprocess.run(["pkexec", "bash", "-c", sys_cmd], check=False)
             if res.returncode == 0:
                 self.notify_user(msg_title, msg_body, icon_name)
         except Exception as e:
-            print(f"Error al ejecutar pkexec: {e}")
+            print(f"Error en pkexec: {e}")
 
-        # Refrescar la interfaz
         GLib.idle_add(self.check_status)
 
 if __name__ == "__main__":
