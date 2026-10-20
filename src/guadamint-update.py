@@ -50,6 +50,8 @@ APPS_OBLIGATORIAS = [
     "dbus-x11"
 ]
 
+# Crear directorio de logs si no existe
+os.makedirs(os.path.dirname(LOG_FILE), exist_ok=True)
 logging.basicConfig(filename=LOG_FILE, level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 TRAY_PROCESS = None
 
@@ -73,7 +75,6 @@ def auto_actualizar_desde_git():
     
     hay_cambios_git = False
     mensaje_git = ""
-    # Detectamos si el script acaba de reiniciarse automáticamente
     es_reinicio = '--restarted' in sys.argv
     
     # 1. Clonar o Actualizar el Repositorio en /opt
@@ -125,7 +126,7 @@ def auto_actualizar_desde_git():
     elif not es_reinicio:
         mostrar_aviso("Sistema al día", "No hay actualizaciones nuevas.")
 
-    # 2. Sincronizar archivos al sistema
+    # 2. Sincronizar archivos al sistema (ROBUSTO)
     se_requiere_reinicio = False
     
     for item in ARCHIVOS_A_SINCRONIZAR:
@@ -134,14 +135,22 @@ def auto_actualizar_desde_git():
         
         try:
             if os.path.exists(ruta_origen):
-                if hay_cambios_git or not os.path.exists(ruta_destino) or \
-                   not filecmp.cmp(ruta_origen, ruta_destino, shallow=False):
+                # Verificar si falta en destino o si los contenidos difieren
+                falta_destino = not os.path.exists(ruta_destino)
+                diferente = not falta_destino and not filecmp.cmp(ruta_origen, ruta_destino, shallow=False)
+                
+                if hay_cambios_git or falta_destino or diferente:
+                    log_y_print(f">>> Desplegando archivo: {os.path.basename(ruta_destino)}")
                     
-                    log_y_print(f">>> Actualizando archivo: {os.path.basename(ruta_destino)}")
+                    # Asegurar que el directorio padre existe antes de copiar
+                    dir_padre = os.path.dirname(ruta_destino)
+                    if dir_padre:
+                        os.makedirs(dir_padre, exist_ok=True)
+
                     shutil.copy2(ruta_origen, ruta_destino)
                     os.chmod(ruta_destino, 0o755)
                     
-                    if ruta_destino == SCRIPT_BIN_PATH:
+                    if ruta_destino == SCRIPT_BIN_PATH and (diferente or hay_cambios_git):
                         se_requiere_reinicio = True
             else:
                 log_y_print(f"!!! Aviso: Archivo fuente no encontrado en repo: {item['origen']}")
@@ -166,18 +175,12 @@ def auto_actualizar_desde_git():
 # ==============================================================================
 
 def obtener_entorno_usuario(usuario):
-    """
-    Obtiene las variables de entorno necesarias para mostrar
-    notificaciones en GNOME / EducaAndOS v2.
-    """
     env_vars = {'DISPLAY': ':0'}
     try:
-        # Obtener el UID numérico del usuario (ej: 1000)
         uid = subprocess.check_output(["id", "-u", usuario], text=True).strip()
         env_vars['XDG_RUNTIME_DIR'] = f"/run/user/{uid}"
         env_vars['DBUS_SESSION_BUS_ADDRESS'] = f"unix:path=/run/user/{uid}/bus"
         
-        # Intentar obtener DISPLAY real por si es diferente de :0
         pids = subprocess.check_output(["pgrep", "-u", usuario, "-f", "gnome-session|gnome-shell|session"], text=True).split()
         for pid in pids:
             try:
@@ -223,11 +226,9 @@ def cerrar_tray_icon():
         except: pass
 
 def mostrar_aviso(titulo, mensaje, icono="info"):
-    # Obtener el usuario real que inició la sesión gráfica
     usuario = obtener_usuario_real()
     if not usuario or usuario == 'root':
         try:
-            # Obtener el primer usuario con sesión gráfica abierta
             usuario = subprocess.check_output(
                 ["loginctl", "list-sessions"], text=True
             ).split("\n")[1].split()[2]
@@ -239,7 +240,6 @@ def mostrar_aviso(titulo, mensaje, icono="info"):
         icono_notif = "dialog-error"
 
     try:
-        # Ejecutamos notify-send en la sesión de usuario a través de systemd
         cmd = [
             'systemd-run',
             f'--machine={usuario}@.host',
@@ -295,7 +295,6 @@ def main():
         escritorio = detectar_escritorio()
         log_y_print(f">>> Escritorio: {escritorio}")
         
-        # Mantenimiento básico
         verificar_e_instalar_apps()
         
         time.sleep(random.randint(5, 10))
