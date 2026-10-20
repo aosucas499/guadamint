@@ -45,8 +45,8 @@ class UpdateSwitchApp:
 
     def is_updates_enabled(self):
         """
-        Las actualizaciones están ACTIVADAS si no existe la marca de bloqueo
-        y existe el archivo/enlace en EXEC_PATH.
+        Las actualizaciones están ACTIVADAS si el ejecutable original existe.
+        Si existe la marca de bloqueo o el ejecutable está en .backup, están DESACTIVADAS.
         """
         if os.path.exists(LOCK_DISABLE):
             return False
@@ -85,34 +85,42 @@ class UpdateSwitchApp:
         current_state = self.is_updates_enabled()
         
         if current_state:
-            # Desactivar: borra procesos, crea flag y fuerza mover con -e (cubre enlaces simbólicos)
-            sys_cmd = (
-                f"mkdir -p /etc/guadamint && "
-                f"touch {LOCK_DISABLE} && "
-                f"pkill -9 -f sar-educaandos- || true; "
-                f"pkill -9 -f guadamint-update || true; "
-                f"if [ -e {EXEC_PATH} ] || [ -L {EXEC_PATH} ]; then mv -f {EXEC_PATH} {BACKUP_PATH}; fi"
-            )
+            # DESACTIVAR: crea la marca de estado, mata procesos activos y renombra el ejecutable
+            bash_script = f"""
+            mkdir -p /etc/guadamint
+            touch {LOCK_DISABLE}
+            pkill -9 -f sar-educaandos- || true
+            pkill -9 -f guadamint-update || true
+            if [ -e "{EXEC_PATH}" ] || [ -L "{EXEC_PATH}" ]; then
+                mv -f "{EXEC_PATH}" "{BACKUP_PATH}"
+            fi
+            """
             msg_title = "Actualizaciones Desactivadas"
-            msg_body = "Se ha detenido el servicio y movido el ejecutable a .backup."
+            msg_body = "Se ha detenido el servicio y renombrado el ejecutable a .backup."
             icon_name = "process-stop"
         else:
-            # Activar: elimina marca de bloqueo y restaura el ejecutable
-            sys_cmd = (
-                f"rm -f {LOCK_DISABLE} && "
-                f"if [ -e {BACKUP_PATH} ] || [ -L {BACKUP_PATH} ]; then mv -f {BACKUP_PATH} {EXEC_PATH}; fi"
-            )
+            # ACTIVAR: elimina la marca de estado y restaura el ejecutable original
+            bash_script = f"""
+            rm -f {LOCK_DISABLE}
+            if [ -e "{BACKUP_PATH}" ] || [ -L "{BACKUP_PATH}" ]; then
+                mv -f "{BACKUP_PATH}" "{EXEC_PATH}"
+            fi
+            """
             msg_title = "Actualizaciones Activadas"
-            msg_body = "Se ha restaurado el ejecutable de actualizaciones."
+            msg_body = "Se ha restaurado el ejecutable original de actualizaciones."
             icon_name = "security-high"
 
+        # Lanzar la ejecución con elevación de privilegios
         try:
-            res = subprocess.run(["pkexec", "bash", "-c", sys_cmd], check=False)
+            res = subprocess.run(["pkexec", "bash", "-c", bash_script], capture_output=True, text=True)
             if res.returncode == 0:
                 self.notify_user(msg_title, msg_body, icon_name)
+            else:
+                print(f"Fallo al cambiar estado: {res.stderr}")
         except Exception as e:
-            print(f"Error en pkexec: {e}")
+            print(f"Error ejecutando pkexec: {e}")
 
+        # Refrescar la interfaz gráfica e icono
         GLib.idle_add(self.check_status)
 
 if __name__ == "__main__":
