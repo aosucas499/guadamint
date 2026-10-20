@@ -7,14 +7,15 @@ gi.require_version('Gtk', '3.0')
 gi.require_version('AppIndicator3', '0.1')
 from gi.repository import Gtk, AppIndicator3, GLib
 
-SERVICES = ["unattended-upgrades", "apt-daily.timer", "apt-daily-upgrade.timer"]
+EXEC_PATH = "/usr/local/bin/educaandos-update"
+BACKUP_PATH = "/usr/local/bin/educaandos-update.backup"
 
 class UpdateSwitchApp:
     def __init__(self):
         # Crear el indicador para el panel superior de GNOME
         self.indicator = AppIndicator3.Indicator.new(
             "guadamint-autoupdate-switch",
-            "software-update-available",
+            "security-high",
             AppIndicator3.IndicatorCategory.SYSTEM_SERVICES
         )
         self.indicator.set_status(AppIndicator3.IndicatorStatus.ACTIVE)
@@ -45,20 +46,16 @@ class UpdateSwitchApp:
         self.check_status()
 
     def is_updates_enabled(self):
-        """Comprueba si el servicio principal unattended-upgrades está habilitado."""
-        try:
-            res = subprocess.run(
-                ["systemctl", "is-enabled", "unattended-upgrades"],
-                stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True
-            )
-            return res.stdout.strip() == "enabled"
-        except Exception:
-            return False
+        """
+        Las actualizaciones están ACTIVADAS si el ejecutable original existe.
+        Si sólo existe el archivo .backup, están DESACTIVADAS.
+        """
+        return os.path.exists(EXEC_PATH)
 
     def notify_user(self, title, message, icon="dialog-information"):
         """Envía notificación usando el bus de sesión de GNOME vía systemd-run."""
         try:
-            user = os.environ.get('USER', 'administrador')
+            user = os.environ.get('SUDO_USER') or os.environ.get('USER', 'administrador')
             cmd = [
                 'systemd-run',
                 f'--machine={user}@.host',
@@ -89,19 +86,25 @@ class UpdateSwitchApp:
         current_state = self.is_updates_enabled()
         
         if current_state:
-            # Acción: Desactivar y enmascarar servicios
-            sys_cmd = "systemctl disable --now unattended-upgrades apt-daily.timer apt-daily-upgrade.timer && systemctl mask unattended-upgrades"
+            # Acción: Matar procesos activos de actualización y deshabilitar el ejecutable
+            sys_cmd = (
+                f"pkill -9 -f sar-educaandos- || true; "
+                f"pkill -9 -f guadamint-update || true; "
+                f"if [ -f {EXEC_PATH} ]; then mv {EXEC_PATH} {BACKUP_PATH}; fi"
+            )
             msg_title = "Actualizaciones Desactivadas"
-            msg_body = "Se han pausado las descargas automáticas del sistema."
-            icon_name = "dialog-warning"
+            msg_body = "Se ha detenido el servicio y renombrado el actualizador a .backup."
+            icon_name = "process-stop"
         else:
-            # Acción: Desenmascarar y activar servicios
-            sys_cmd = "systemctl unmask unattended-upgrades && systemctl enable --now unattended-upgrades apt-daily.timer apt-daily-upgrade.timer"
+            # Acción: Restaurar el ejecutable original
+            sys_cmd = (
+                f"if [ -f {BACKUP_PATH} ]; then mv {BACKUP_PATH} {EXEC_PATH}; fi"
+            )
             msg_title = "Actualizaciones Activadas"
-            msg_body = "El sistema volverá a buscar e instalar actualizaciones automáticamente."
-            icon_name = "software-update-available"
+            msg_body = "Se ha restaurado el ejecutable original de actualizaciones."
+            icon_name = "security-high"
 
-        # Elevar privilegios mediante pkexec
+        # Elevar privilegios mediante pkexec para mover el archivo en /usr/local/bin
         full_cmd = f"pkexec bash -c '{sys_cmd}'"
         res = subprocess.run(full_cmd, shell=True)
 
