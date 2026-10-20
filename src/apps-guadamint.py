@@ -283,7 +283,25 @@ class FilaApp(Gtk.ListBoxRow):
         
         if success:
             user = os.environ.get('SUDO_USER', os.environ.get('USER'))
-            subprocess.Popen(['sudo', '-u', user, 'notify-send', '-i', 'system-software-update', 'GuadaMint Store', f'Operación completada: {self.app_data["nombre"]}'])
+            if not user or user == 'root':
+                try:
+                    user = subprocess.check_output(
+                        ["loginctl", "list-sessions"], text=True
+                    ).split("\n")[1].split()[2]
+                except:
+                    user = "administrador"
+
+            cmd = [
+                'systemd-run',
+                f'--machine={user}@.host',
+                '--user',
+                'notify-send',
+                '-a', 'GuadaMint Store',
+                '-i', 'system-software-update',
+                'GuadaMint Store',
+                f'Operación completada: {self.app_data["nombre"]}'
+            ]
+            subprocess.Popen(cmd, stderr=subprocess.DEVNULL)
         else:
             self.switch.handler_block(self.handler_id)
             self.switch.set_active(not intended_state)
@@ -293,7 +311,7 @@ class FilaApp(Gtk.ListBoxRow):
             else: self.mostrar_error("Operación fallida. Revise los logs.")
         
         return False
-
+        
 class GuadaStoreWindow(Gtk.Window):
     def __init__(self):
         super().__init__(title=TITULO_APP)
