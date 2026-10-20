@@ -9,10 +9,10 @@ from gi.repository import Gtk, AppIndicator3, GLib
 
 EXEC_PATH = "/usr/local/bin/educaandos-update"
 BACKUP_PATH = "/usr/local/bin/educaandos-update.backup"
+LOCK_DISABLE = "/etc/guadamint/updates.disabled"
 
 class UpdateSwitchApp:
     def __init__(self):
-        # Crear el indicador para el panel superior de GNOME
         self.indicator = AppIndicator3.Indicator.new(
             "guadamint-autoupdate-switch",
             "security-high",
@@ -20,7 +20,6 @@ class UpdateSwitchApp:
         )
         self.indicator.set_status(AppIndicator3.IndicatorStatus.ACTIVE)
         
-        # Crear menú contextual
         self.menu = Gtk.Menu()
         
         self.item_status = Gtk.MenuItem(label="Estado: Comprobando...")
@@ -42,18 +41,18 @@ class UpdateSwitchApp:
         self.menu.show_all()
         self.indicator.set_menu(self.menu)
         
-        # Consultar estado inicial
         self.check_status()
 
     def is_updates_enabled(self):
         """
-        Las actualizaciones están ACTIVADAS si el ejecutable original existe.
-        Si sólo existe el archivo .backup, están DESACTIVADAS.
+        Las actualizaciones están ACTIVADAS si existe el ejecutable 
+        y no existe la marca de bloqueo global.
         """
+        if os.path.exists(LOCK_DISABLE):
+            return False
         return os.path.exists(EXEC_PATH)
 
     def notify_user(self, title, message, icon="dialog-information"):
-        """Envía notificación usando el bus de sesión de GNOME vía systemd-run."""
         try:
             user = os.environ.get('SUDO_USER') or os.environ.get('USER', 'administrador')
             cmd = [
@@ -86,32 +85,36 @@ class UpdateSwitchApp:
         current_state = self.is_updates_enabled()
         
         if current_state:
-            # Acción: Matar procesos activos de actualización y deshabilitar el ejecutable
+            # Comando de desactivación: crea bandera, mata procesos y renombra el binario
             sys_cmd = (
+                f"mkdir -p /etc/guadamint && "
+                f"touch {LOCK_DISABLE} && "
                 f"pkill -9 -f sar-educaandos- || true; "
                 f"pkill -9 -f guadamint-update || true; "
-                f"if [ -f {EXEC_PATH} ]; then mv {EXEC_PATH} {BACKUP_PATH}; fi"
+                f"if [ -f {EXEC_PATH} ]; then mv -f {EXEC_PATH} {BACKUP_PATH}; fi"
             )
             msg_title = "Actualizaciones Desactivadas"
-            msg_body = "Se ha detenido el servicio y renombrado el actualizador a .backup."
+            msg_body = "Se ha detenido el servicio y deshabilitado el ejecutable."
             icon_name = "process-stop"
         else:
-            # Acción: Restaurar el ejecutable original
+            # Comando de activación: elimina bandera y restaura el binario
             sys_cmd = (
-                f"if [ -f {BACKUP_PATH} ]; then mv {BACKUP_PATH} {EXEC_PATH}; fi"
+                f"rm -f {LOCK_DISABLE} && "
+                f"if [ -f {BACKUP_PATH} ]; then mv -f {BACKUP_PATH} {EXEC_PATH}; fi"
             )
             msg_title = "Actualizaciones Activadas"
-            msg_body = "Se ha restaurado el ejecutable original de actualizaciones."
+            msg_body = "Se ha restaurado el actualizador del sistema."
             icon_name = "security-high"
 
-        # Elevar privilegios mediante pkexec para mover el archivo en /usr/local/bin
-        full_cmd = f"pkexec bash -c '{sys_cmd}'"
-        res = subprocess.run(full_cmd, shell=True)
+        # Ejecutamos pkexec de forma síncrona
+        try:
+            res = subprocess.run(["pkexec", "bash", "-c", sys_cmd], check=False)
+            if res.returncode == 0:
+                self.notify_user(msg_title, msg_body, icon_name)
+        except Exception as e:
+            print(f"Error al ejecutar pkexec: {e}")
 
-        if res.returncode == 0:
-            self.notify_user(msg_title, msg_body, icon_name)
-        
-        # Actualizar interfaz tras el cambio
+        # Refrescar la interfaz
         GLib.idle_add(self.check_status)
 
 if __name__ == "__main__":
