@@ -78,11 +78,11 @@ class UpdateSwitchApp:
         if enabled:
             self.item_status.set_label("Actualizaciones: ACTIVADAS")
             self.item_toggle.set_label("Desactivar Actualizaciones Automáticas")
-            self.indicator.set_icon_full("software-update-available", "Actualizaciones activadas")
+            self.indicator.set_icon_full("security-high", "Actualizaciones activadas")
         else:
             self.item_status.set_label("Actualizaciones: DESACTIVADAS")
             self.item_toggle.set_label("Activar Actualizaciones Automáticas")
-            self.indicator.set_icon_full("software-update-urgent", "Actualizaciones desactivadas")
+            self.indicator.set_icon_full("process-stop", "Actualizaciones desactivadas")
         return False
 
     def on_toggle_clicked(self, widget):
