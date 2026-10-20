@@ -212,36 +212,36 @@ def cerrar_tray_icon():
         except: pass
 
 def mostrar_aviso(titulo, mensaje, icono="info"):
-    """
-    Muestra una notificación flotante compatible con GNOME en EOS v2.
-    """
+    # Obtener el usuario real que inició la sesión gráfica
     usuario = obtener_usuario_real()
     if not usuario or usuario == 'root':
-        # Si no hay SUDO_USER, intentamos detectar qué usuario tiene la sesión gráfica activa
         try:
-            usuario = subprocess.check_output(["loginctl", "list-sessions"], text=True).split("\n")[1].split()[2]
+            # Obtener el primer usuario con sesión gráfica abierta
+            usuario = subprocess.check_output(
+                ["loginctl", "list-sessions"], text=True
+            ).split("\n")[1].split()[2]
         except:
             usuario = "administrador"
 
-    entorno = os.environ.copy()
-    entorno.update(obtener_entorno_usuario(usuario))
-    
     icono_notif = ICONO_DEFECTO if os.path.exists(ICONO_DEFECTO) else "dialog-information"
     if icono == "error":
         icono_notif = "dialog-error"
-        
-    try: 
-        # Invocamos notify-send con las variables de entorno de la sesión gráfica de GNOME
-        subprocess.Popen(
-            ['sudo', '-u', usuario, 'env', 
-             f"DISPLAY={entorno.get('DISPLAY', ':0')}", 
-             f"DBUS_SESSION_BUS_ADDRESS={entorno.get('DBUS_SESSION_BUS_ADDRESS', '')}", 
-             f"XDG_RUNTIME_DIR={entorno.get('XDG_RUNTIME_DIR', '')}", 
-             'notify-send', '-a', 'GuadaMint', '-i', icono_notif, titulo, mensaje],
-            stderr=subprocess.DEVNULL
-        )
+
+    try:
+        # Ejecutamos notify-send en la sesión de usuario a través de systemd
+        cmd = [
+            'systemd-run',
+            f'--machine={usuario}@.host',
+            '--user',
+            'notify-send',
+            '-a', 'GuadaMint',
+            '-i', icono_notif,
+            titulo,
+            mensaje
+        ]
+        subprocess.Popen(cmd, stderr=subprocess.DEVNULL)
     except Exception as e:
-        log_y_print(f"!!! Error enviando notificación: {e}")
+        log_y_print(f"!!! Error al lanzar notificación: {e}")
         
 def detectar_escritorio():
     if os.path.exists("/usr/bin/gnome-shell"): return "GNOME"
