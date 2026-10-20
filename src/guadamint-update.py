@@ -29,6 +29,14 @@ ARCHIVOS_A_SINCRONIZAR = [
     {
         "origen": "src/apps-guadamint.py",   
         "destino": "/usr/bin/apps-guadamint.py"
+    },
+    {
+        "origen": "src/switch-autoupdate/guadamint-toggle-updates.py",
+        "destino": "/usr/bin/guadamint-toggle-updates.py"
+    },
+    {
+        "origen": "src/switch-autoupdate/guadamint-autoupdate-switch.desktop",
+        "destino": "/etc/xdg/autostart/guadamint-autoupdate-switch.desktop"
     }
 ]
 
@@ -36,7 +44,10 @@ SCRIPT_BIN_PATH = "/usr/bin/guadamint-update.py"
 
 # LISTA DE HERRAMIENTAS BASE OBLIGATORIAS
 APPS_OBLIGATORIAS = [
-    "git"  # Sistema de control de versiones necesario para la auto-actualización
+    "git",
+    "gir1.2-appindicator3-0.1",
+    "gir1.2-gtk-3.0",
+    "dbus-x11"
 ]
 
 logging.basicConfig(filename=LOG_FILE, level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
