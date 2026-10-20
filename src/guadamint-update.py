@@ -31,11 +31,11 @@ ARCHIVOS_A_SINCRONIZAR = [
         "destino": "/usr/bin/apps-guadamint.py"
     },
     {
-        "origen": "src/switch-autoupdate/guadamint-toggle-updates.py",
+        "origen": "src/guadamint-toggle-updates.py",
         "destino": "/usr/bin/guadamint-toggle-updates.py"
     },
     {
-        "origen": "src/switch-autoupdate/guadamint-autoupdate-switch.desktop",
+        "origen": "src/guadamint-autoupdate-switch.desktop",
         "destino": "/etc/xdg/autostart/guadamint-autoupdate-switch.desktop"
     }
 ]
