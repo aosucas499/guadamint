@@ -40,14 +40,12 @@ class UpdateSwitchApp:
         self.menu.show_all()
         self.indicator.set_menu(self.menu)
         
-        # Comprobar el estado real del archivo nada más arrancar
         self.check_status()
 
     def is_updates_enabled(self):
         """
-        Detección del estado real por existencia del binario original:
-        - Si existe /usr/local/bin/educaandos-update -> ACTIVADAS (True)
-        - Si existe /usr/local/bin/educaandos-update.backup -> DESACTIVADAS (False)
+        Las actualizaciones están ACTIVADAS si existe el ejecutable original.
+        Si no existe o si existe el ejecutable .backup, están DESACTIVADAS.
         """
         if os.path.exists(BACKUP_PATH) or os.path.islink(BACKUP_PATH):
             return False
@@ -82,33 +80,41 @@ class UpdateSwitchApp:
             self.indicator.set_icon_full("process-stop", "Actualizaciones desactivadas")
         return False
 
+    def run_root_command(self, cmd_list):
+        """Ejecuta comandos de root con pkexec sin pasar por shells intermedias."""
+        try:
+            res = subprocess.run(["pkexec"] + cmd_list, capture_output=True, text=True)
+            return res.returncode == 0
+        except Exception as e:
+            print(f"Error al ejecutar pkexec: {e}")
+            return False
+
     def on_toggle_clicked(self, widget):
         current_state = self.is_updates_enabled()
         
         if current_state:
-            # DESACTIVAR: Matar procesos activos y renombrar archivo a .backup
-            sys_cmd = f"pkill -9 -f sar-educaandos- ; pkill -9 -f guadamint-update ; mv -f {EXEC_PATH} {BACKUP_PATH}"
+            # 1. Matar procesos activos de actualizadores
+            subprocess.run(["pkexec", "pkill", "-9", "-f", "sar-educaandos-"], capture_output=True)
+            subprocess.run(["pkexec", "pkill", "-9", "-f", "guadamint-update"], capture_output=True)
+            
+            # 2. Renombrar ejecutable a .backup
+            success = self.run_root_command(["mv", "-f", EXEC_PATH, BACKUP_PATH])
+            
             msg_title = "Actualizaciones Desactivadas"
-            msg_body = "Se ha detenido el servicio y renombrado el ejecutable a .backup."
+            msg_body = "Se han detenido los procesos y renombrado el ejecutable a .backup."
             icon_name = "process-stop"
         else:
-            # ACTIVAR: Restaurar ejecutable desde .backup
-            sys_cmd = f"mv -f {BACKUP_PATH} {EXEC_PATH}"
+            # 1. Restaurar ejecutable desde .backup
+            success = self.run_root_command(["mv", "-f", BACKUP_PATH, EXEC_PATH])
+            
             msg_title = "Actualizaciones Activadas"
             msg_body = "Se ha restaurado el ejecutable original de actualizaciones."
             icon_name = "security-high"
 
-        try:
-            # Ejecución con elevación gráfica directa
-            res = subprocess.run(["pkexec", "sh", "-c", sys_cmd], capture_output=True, text=True)
-            if res.returncode == 0:
-                self.notify_user(msg_title, msg_body, icon_name)
-            else:
-                print(f"pkexec cancelado o denegado: {res.stderr}")
-        except Exception as e:
-            print(f"Error en ejecución: {e}")
+        if success:
+            self.notify_user(msg_title, msg_body, icon_name)
 
-        # Actualizar la interfaz basándose en la presencia del archivo
+        # Refrescar interfaz e icono basándonos en la existencia real en disco
         GLib.idle_add(self.check_status)
 
 if __name__ == "__main__":
