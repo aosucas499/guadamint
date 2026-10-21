@@ -43,16 +43,13 @@ class UpdateSwitchApp:
         self.check_status()
 
     def is_updates_enabled(self):
-        """
-        Las actualizaciones están ACTIVADAS si existe el ejecutable principal.
-        Si existe la copia .backup, están DESACTIVADAS.
-        """
         if os.path.exists(BACKUP_PATH) or os.path.islink(BACKUP_PATH):
             return False
         return os.path.exists(EXEC_PATH) or os.path.islink(EXEC_PATH)
 
     def notify_user(self, title, message, icon="dialog-information"):
         try:
+            # Detectar el usuario de la sesión de escritorio
             user = os.environ.get('SUDO_USER') or os.environ.get('USER', 'administrador')
             cmd = [
                 'systemd-run',
@@ -83,32 +80,32 @@ class UpdateSwitchApp:
     def on_toggle_clicked(self, widget):
         current_state = self.is_updates_enabled()
         
-        if current_state:
-            # DESACTIVAR
-            # 1. Detener actualizadores activos (ignorar si no hay ninguno corriendo)
-            subprocess.run(["sudo", "pkill", "-9", "-f", "sar-educaandos-"], capture_output=True)
-            subprocess.run(["sudo", "pkill", "-9", "-f", "guadamint-update"], capture_output=True)
-            
-            # 2. Renombrar archivo
-            res = subprocess.run(["sudo", "mv", "-f", EXEC_PATH, BACKUP_PATH], capture_output=True, text=True)
-            
-            msg_title = "Actualizaciones Desactivadas"
-            msg_body = "Se ha renombrado el ejecutable a .backup y detenido los procesos."
-            icon_name = "process-stop"
-        else:
-            # ACTIVAR
-            res = subprocess.run(["sudo", "mv", "-f", BACKUP_PATH, EXEC_PATH], capture_output=True, text=True)
-            
-            msg_title = "Actualizaciones Activadas"
-            msg_body = "Se ha restaurado el ejecutable original de actualizaciones."
-            icon_name = "security-high"
+        try:
+            if current_state:
+                # 1. Matar procesos activos
+                subprocess.run(["pkill", "-9", "-f", "sar-educaandos-"], stderr=subprocess.DEVNULL)
+                subprocess.run(["pkill", "-9", "-f", "guadamint-update"], stderr=subprocess.DEVNULL)
+                
+                # 2. Renombrar con Python nativo (sin llamar a mv ni a sudo)
+                if os.path.exists(EXEC_PATH):
+                    os.rename(EXEC_PATH, BACKUP_PATH)
+                
+                msg_title = "Actualizaciones Desactivadas"
+                msg_body = "Se ha detenido el servicio y renombrado el ejecutable a .backup."
+                icon_name = "process-stop"
+            else:
+                # 1. Restaurar archivo con Python nativo
+                if os.path.exists(BACKUP_PATH):
+                    os.rename(BACKUP_PATH, EXEC_PATH)
+                
+                msg_title = "Actualizaciones Activadas"
+                msg_body = "Se ha restaurado el ejecutable original de actualizaciones."
+                icon_name = "security-high"
 
-        if res.returncode == 0:
             self.notify_user(msg_title, msg_body, icon_name)
-        else:
-            print(f"[DEBUG DETALLADO ERROR] ReturnCode: {res.returncode}")
-            print(f"[DEBUG STDOUT]: {res.stdout}")
-            print(f"[DEBUG STDERR]: {res.stderr}")
+
+        except Exception as e:
+            print(f"Error al cambiar estado: {e}")
 
         GLib.idle_add(self.check_status)
 
