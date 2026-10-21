@@ -20,32 +20,46 @@ REPO_URL = "https://github.com/aosucas499/guadamint.git"
 REPO_DIR = "/opt/guadamint"
 REPO_BRANCH = "eos" 
 
-# Lista de archivos a sincronizar cuando guadamint-update.py descarga cambios de Git
+import os
+import shutil
+import subprocess
+
+REPO_DIR = "/opt/guadamint/repo"  # O la ruta donde clonas tu repositorio local/git
+
+# Lista de archivos a sincronizar automáticamente en cada actualización de Git
 ARCHIVOS_A_SINCRONIZAR = [
-    # (Origen en repo, Destino absoluto en sistema, Permisos Octales)
+    # (Origen en repo, Destino absoluto en el sistema, Permisos Octales)
     ("src/guadamint-update.py", "/usr/bin/guadamint-update.py", 0o755),
     ("src/apps-guadamint.py", "/usr/bin/apps-guadamint.py", 0o755),
+    
+    # --- TOGGLE Y SUS PERMISOS ---
     ("src/guadamint-toggle-updates.py", "/usr/bin/guadamint-toggle-updates.py", 0o755),
-    ("src/zz-guadamint-update", "/etc/sudoers.d/zz-guadamint-update", 0o440),
     ("src/zz-guadamint-toggle-updates", "/etc/sudoers.d/zz-guadamint-toggle-updates", 0o440),
-    ("src/guadamint-update.desktop", "/etc/xdg/autostart/guadamint-update.desktop", 0o644),
     ("src/guadamint-toggle-updates.desktop", "/etc/xdg/autostart/guadamint-toggle-updates.desktop", 0o644),
+    
+    # --- OTROS ARCHIVOS ---
+    ("src/zz-guadamint-update", "/etc/sudoers.d/zz-guadamint-update", 0o440),
+    ("src/guadamint-update.desktop", "/etc/xdg/autostart/guadamint-update.desktop", 0o644),
     ("src/apps-guadamint.desktop", "/usr/share/applications/apps-guadamint.desktop", 0o644),
 ]
 
 def desplegar_actualizaciones():
-    """Copia los archivos descargados de Git a sus rutas finales de sistema."""
+    """Copia los archivos del repositorio Git a sus destinos en el sistema."""
     for origen_rel, destino_abs, permisos in ARCHIVOS_A_SINCRONIZAR:
         origen_abs = os.path.join(REPO_DIR, origen_rel)
         if os.path.exists(origen_abs):
             try:
+                # Copiar archivo preservando metadatos
                 shutil.copy2(origen_abs, destino_abs)
                 os.chmod(destino_abs, permisos)
-                # Sudoers requiere propietario root:root
+                
+                # Regla de seguridad obligatoria de Linux: los archivos en sudoers.d DEBEN pertenecer a root:root
                 if "/etc/sudoers.d/" in destino_abs:
                     shutil.chown(destino_abs, user="root", group="root")
+                    
+                print(f"[OK] Sincronizado: {origen_rel} -> {destino_abs}")
             except Exception as e:
-                print(f"Error al copiar {origen_rel} a {destino_abs}: {e}")
+                print(f"[ERROR] No se pudo copiar {origen_rel} a {destino_abs}: {e}")
 
 SCRIPT_BIN_PATH = "/usr/bin/guadamint-update.py"
 
