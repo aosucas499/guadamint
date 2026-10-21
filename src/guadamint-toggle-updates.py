@@ -70,7 +70,7 @@ class UpdateSwitchApp:
         if enabled:
             self.item_status.set_label("Actualizaciones: ACTIVADAS")
             self.item_toggle.set_label("Desactivar Actualizaciones Automáticas")
-            self.indicator.set_icon_full("security-high", "Actualizaciones activadas")
+            self.indicator.set_icon_full("software-update-available", "Actualizaciones activadas")
         else:
             self.item_status.set_label("Actualizaciones: DESACTIVADAS")
             self.item_toggle.set_label("Activar Actualizaciones Automáticas")
