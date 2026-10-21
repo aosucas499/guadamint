@@ -20,25 +20,32 @@ REPO_URL = "https://github.com/aosucas499/guadamint.git"
 REPO_DIR = "/opt/guadamint"
 REPO_BRANCH = "eos" 
 
-# --- ARCHIVOS QUE SE DEBEN ACTUALIZAR DESDE GITHUB ---
+# Lista de archivos a sincronizar cuando guadamint-update.py descarga cambios de Git
 ARCHIVOS_A_SINCRONIZAR = [
-    {
-        "origen": "src/guadamint-update.py", 
-        "destino": "/usr/bin/guadamint-update.py"
-    },
-    {
-        "origen": "src/apps-guadamint.py",   
-        "destino": "/usr/bin/apps-guadamint.py"
-    },
-    {
-        "origen": "src/guadamint-toggle-updates.py",
-        "destino": "/usr/bin/guadamint-toggle-updates.py"
-    },
-    {
-        "origen": "src/guadamint-autoupdate-switch.desktop",
-        "destino": "/etc/xdg/autostart/guadamint-autoupdate-switch.desktop"
-    }
+    # (Origen en repo, Destino absoluto en sistema, Permisos Octales)
+    ("src/guadamint-update.py", "/usr/bin/guadamint-update.py", 0o755),
+    ("src/apps-guadamint.py", "/usr/bin/apps-guadamint.py", 0o755),
+    ("src/guadamint-toggle-updates.py", "/usr/bin/guadamint-toggle-updates.py", 0o755),
+    ("src/zz-guadamint-update", "/etc/sudoers.d/zz-guadamint-update", 0o440),
+    ("src/zz-guadamint-toggle-updates", "/etc/sudoers.d/zz-guadamint-toggle-updates", 0o440),
+    ("src/guadamint-update.desktop", "/etc/xdg/autostart/guadamint-update.desktop", 0o644),
+    ("src/guadamint-toggle-updates.desktop", "/etc/xdg/autostart/guadamint-toggle-updates.desktop", 0o644),
+    ("src/apps-guadamint.desktop", "/usr/share/applications/apps-guadamint.desktop", 0o644),
 ]
+
+def desplegar_actualizaciones():
+    """Copia los archivos descargados de Git a sus rutas finales de sistema."""
+    for origen_rel, destino_abs, permisos in ARCHIVOS_A_SINCRONIZAR:
+        origen_abs = os.path.join(REPO_DIR, origen_rel)
+        if os.path.exists(origen_abs):
+            try:
+                shutil.copy2(origen_abs, destino_abs)
+                os.chmod(destino_abs, permisos)
+                # Sudoers requiere propietario root:root
+                if "/etc/sudoers.d/" in destino_abs:
+                    shutil.chown(destino_abs, user="root", group="root")
+            except Exception as e:
+                print(f"Error al copiar {origen_rel} a {destino_abs}: {e}")
 
 SCRIPT_BIN_PATH = "/usr/bin/guadamint-update.py"
 
