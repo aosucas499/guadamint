@@ -151,8 +151,12 @@ def auto_actualizar_desde_git():
     se_requiere_reinicio = False
     
     for item in ARCHIVOS_A_SINCRONIZAR:
-        ruta_origen = os.path.join(REPO_DIR, item["origen"])
-        ruta_destino = item["destino"]
+        # CORRECCIÓN: Acceso correcto a la tupla mediante índices enteros (0, 1, 2)
+        origen_rel = item[0]
+        ruta_destino = item[1]
+        permisos = item[2]
+        
+        ruta_origen = os.path.join(REPO_DIR, origen_rel)
         
         try:
             if os.path.exists(ruta_origen):
@@ -169,15 +173,19 @@ def auto_actualizar_desde_git():
                         os.makedirs(dir_padre, exist_ok=True)
 
                     shutil.copy2(ruta_origen, ruta_destino)
-                    os.chmod(ruta_destino, 0o755)
+                    os.chmod(ruta_destino, permisos)
+                    
+                    # Seguridad en sudoers.d: obligatoriamente root:root
+                    if "/etc/sudoers.d/" in ruta_destino:
+                        shutil.chown(ruta_destino, user="root", group="root")
                     
                     if ruta_destino == SCRIPT_BIN_PATH and (diferente or hay_cambios_git):
                         se_requiere_reinicio = True
             else:
-                log_y_print(f"!!! Aviso: Archivo fuente no encontrado en repo: {item['origen']}")
+                log_y_print(f"!!! Aviso: Archivo fuente no encontrado en repo: {origen_rel}")
         except Exception as e:
             log_y_print(f"!!! Error sincronizando {ruta_destino}: {e}")
-
+            
     # 3. Reiniciar si el propio script cambió
     if se_requiere_reinicio:
         log_y_print(">>> EL ACTUALIZADOR SE HA ACTUALIZADO. REINICIANDO PROCESO...")
