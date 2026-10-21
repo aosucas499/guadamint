@@ -28,19 +28,18 @@ REPO_DIR = "/opt/guadamint/repo"  # O la ruta donde clonas tu repositorio local/
 
 # Lista de archivos a sincronizar automáticamente en cada actualización de Git
 ARCHIVOS_A_SINCRONIZAR = [
-    # (Origen en repo, Destino absoluto en el sistema, Permisos Octales)
+    # Actualizador principal y Tienda
     ("src/guadamint-update.py", "/usr/bin/guadamint-update.py", 0o755),
     ("src/apps-guadamint.py", "/usr/bin/apps-guadamint.py", 0o755),
-    
-    # --- TOGGLE Y SUS PERMISOS ---
-    ("src/guadamint-toggle-updates.py", "/usr/bin/guadamint-toggle-updates.py", 0o755),
-    ("src/zz-guadamint-toggle-updates", "/etc/sudoers.d/zz-guadamint-toggle-updates", 0o440),
-    ("src/guadamint-toggle-updates.desktop", "/etc/xdg/autostart/guadamint-toggle-updates.desktop", 0o644),
-    
-    # --- OTROS ARCHIVOS ---
     ("src/zz-guadamint-update", "/etc/sudoers.d/zz-guadamint-update", 0o440),
     ("src/guadamint-update.desktop", "/etc/xdg/autostart/guadamint-update.desktop", 0o644),
     ("src/apps-guadamint.desktop", "/usr/share/applications/apps-guadamint.desktop", 0o644),
+
+    # --- CONMUTADOR (TOGGLE) ---
+    ("src/guadamint-toggle-updates.py", "/usr/bin/guadamint-toggle-updates.py", 0o755),
+    ("src/zz-guadamint-toggle-updates", "/etc/sudoers.d/zz-guadamint-toggle-updates", 0o440),
+    # CORREGIDO: Usamos el nombre real del archivo en src/
+    ("src/guadamint-autoupdate-switch.desktop", "/etc/xdg/autostart/guadamint-autoupdate-switch.desktop", 0o644),
 ]
 
 def desplegar_actualizaciones():
