@@ -9,35 +9,28 @@ fi
 echo ">>> Instalando sistema GuadaMint (Actualizador + Tienda)..."
 
 # 0. INSTALAR DEPENDENCIAS (GIT)
-# Vital para que funcione la auto-actualización de los scripts Python
 echo "Comprobando dependencias..."
 if ! command -v git &> /dev/null; then
     echo "-> Git no encontrado. Instalando..."
-    apt-get update
-    apt-get install -y git
-    if [ $? -eq 0 ]; then
-        echo "-> Git instalado correctamente."
-    else
+    apt-get update && apt-get install -y git
+    if [ $? -ne 0 ]; then
         echo "¡ERROR CRÍTICO! No se pudo instalar git. El actualizador fallará."
         exit 1
     fi
-else
-    echo "-> Git ya está instalado. Correcto."
 fi
 
 # 1. DEFINIR RUTAS DE ORIGEN Y DESTINO
 SOURCE_DIR=$(dirname "$0")
 
-# Destinos en el sistema
 DEST_BIN_UPDATE="/usr/bin/guadamint-update.py"  
 DEST_BIN_STORE="/usr/bin/apps-guadamint.py"
 DEST_AUTOSTART="/etc/xdg/autostart/guadamint-update.desktop"
 DEST_LAUNCHER_STORE="/usr/share/applications/apps-guadamint.desktop"
 DEST_ICON="/usr/share/icons/guadamintuz.svg"
 LOG_DIR="/var/log/guadamint"
+OPT_DIR="/opt/guadamint"
 
 # FUNCIÓN DE BÚSQUEDA INTELIGENTE
-# Busca el archivo en la subcarpeta indicada (ej: src) O en la carpeta raíz del instalador
 buscar_archivo() {
     local archivo=$1
     local subcarpeta=$2
@@ -50,8 +43,12 @@ buscar_archivo() {
     fi
 }
 
-# 2. CONFIGURAR SUDOERS
-# Permite que el actualizador se ejecute sin pedir contraseña al alumno
+# 2. CREAR ESTRUCTURA BASE EN /opt/guadamint
+echo "Creando directorios base en /opt/guadamint..."
+mkdir -p "$OPT_DIR/images"
+mkdir -p "$OPT_DIR/src"
+
+# 3. COMPROBACIÓN E INSTALACIÓN DEL SUDOERS (PERMISOS)
 FILE_SUDOERS=$(buscar_archivo "zz-guadamint-update" "src")
 SUDOERS_DEST="/etc/sudoers.d/zz-guadamint-update"
 
@@ -65,104 +62,59 @@ else
     exit 1
 fi
 
-# 3. COPIAR EL SCRIPT ACTUALIZADOR (PYTHON)
+# 4. COPIAR IMÁGENES INICIALES A /opt/guadamint/images/
+if [ -d "$SOURCE_DIR/images" ]; then
+    echo "Copiando imágenes iniciales a $OPT_DIR/images/..."
+    cp -r "$SOURCE_DIR/images/"* "$OPT_DIR/images/" 2>/dev/null
+fi
+
+# 5. COPIAR EL SCRIPT ACTUALIZADOR (PYTHON)
 FILE_UPDATE=$(buscar_archivo "guadamint-update.py" "src")
 
 if [ -n "$FILE_UPDATE" ]; then
-    echo "Copiando actualizador $FILE_UPDATE a $DEST_BIN_UPDATE..."
+    echo "Copiando actualizador a $DEST_BIN_UPDATE y $OPT_DIR/src/..."
     cp "$FILE_UPDATE" "$DEST_BIN_UPDATE"
     chmod 755 "$DEST_BIN_UPDATE"
+    
+    cp "$FILE_UPDATE" "$OPT_DIR/src/guadamint-update.py"
+    chmod 755 "$OPT_DIR/src/guadamint-update.py"
 else
     echo "¡ERROR CRÍTICO! No se encuentra 'guadamint-update.py'."
     exit 1
 fi
 
-# 4. COPIAR LA TIENDA DE APPS (PYTHON)
+# 6. COPIAR LA TIENDA DE APPS (PYTHON)
 FILE_STORE=$(buscar_archivo "apps-guadamint.py" "src")
 
 if [ -n "$FILE_STORE" ]; then
-    echo "Copiando tienda $FILE_STORE a $DEST_BIN_STORE..."
     cp "$FILE_STORE" "$DEST_BIN_STORE"
     chmod 755 "$DEST_BIN_STORE"
-else
-    echo "AVISO: No se encuentra 'apps-guadamint.py'. La tienda no se instalará."
+    cp "$FILE_STORE" "$OPT_DIR/src/apps-guadamint.py" 2>/dev/null
 fi
 
-# 5. COPIAR EL AUTOARRANQUE (.desktop)
-# Esto hace que el actualizador arranque al iniciar sesión
+# 7. COPIAR AUTOARRANQUE Y LANZADOR (.desktop)
 FILE_AUTOSTART=$(buscar_archivo "guadamint-update.desktop" "src")
-
 if [ -n "$FILE_AUTOSTART" ]; then
-    echo "Copiando autostart $FILE_AUTOSTART a $DEST_AUTOSTART..."
     cp "$FILE_AUTOSTART" "$DEST_AUTOSTART"
     chmod 644 "$DEST_AUTOSTART"
-else
-    echo "¡ERROR CRÍTICO! No se encuentra 'guadamint-update.desktop'."
-    exit 1
 fi
 
-# 6. COPIAR EL LANZADOR DE LA TIENDA (.desktop)
-# Esto pone la tienda en el menú de aplicaciones
 FILE_LAUNCHER=$(buscar_archivo "apps-guadamint.desktop" "src")
-
 if [ -n "$FILE_LAUNCHER" ]; then
-    echo "Copiando lanzador de menú $FILE_LAUNCHER a $DEST_LAUNCHER_STORE..."
     cp "$FILE_LAUNCHER" "$DEST_LAUNCHER_STORE"
     chmod 644 "$DEST_LAUNCHER_STORE"
-else
-    echo "AVISO: No se encuentra 'apps-guadamint.desktop'."
 fi
 
-# 7. INSTALAR ICONO
-# Buscamos guadamintuz.svg en images/ o raíz. Si no, probamos con el nombre antiguo.
+# 8. INSTALAR ICONO
 FILE_ICON=$(buscar_archivo "guadamintuz.svg" "images")
 if [ -z "$FILE_ICON" ]; then FILE_ICON=$(buscar_archivo "AndaTuz2.svg" "images"); fi
-
-echo "Instalando icono en $DEST_ICON..."
 if [ -n "$FILE_ICON" ]; then
     cp "$FILE_ICON" "$DEST_ICON"
     chmod 644 "$DEST_ICON"
-    echo "-> Icono instalado."
-else
-    echo "AVISO: No se encontró el icono (guadamintuz.svg). Se usará genérico."
 fi
 
-# 8. CREAR DIRECTORIO DE LOGS Y DAR PERMISOS
+# 9. CREAR CARPETA DE LOGS CON PERMISOS
 mkdir -p "$LOG_DIR"
-# Damos permisos 777 para que el usuario pueda escribir logs si lo necesita,
-# aunque el script principal corre como root gracias a sudoers.
 chmod 777 "$LOG_DIR"
 
 echo ">>> Instalación completada con éxito."
-
-# ==============================================================================
-# CONFIGURACIÓN DE ESTRUCTURA Y PERMISOS DE GUADAMINT UPDATE
-# ==============================================================================
-echo "-> Preparando entorno para GuadaMint Update..."
-
-# 1. Crear las carpetas base en /opt/guadamint si no existen
-mkdir -p /opt/guadamint/images
-mkdir -p /opt/guadamint/src
-mkdir -p /var/log/guadamint
-
-# 2. Asignar permisos a la carpeta de logs
-chmod 777 /var/log/guadamint
-
-# 3. Copiar las imágenes iniciales si se incluyen con el paquete instalador
-if [ -d "$SOURCE_DIR/images" ]; then
-    cp -r "$SOURCE_DIR/images/"* /opt/guadamint/images/ 2>/dev/null
-fi
-
-# 4. Copiar la primera versión del script semilla
-FILE_UPDATE=$(buscar_archivo "guadamint-update.py" "src")
-if [ -n "$FILE_UPDATE" ]; then
-    # Copiar a la ruta binaria del sistema
-    cp "$FILE_UPDATE" /usr/bin/guadamint-update.py
-    chmod 755 /usr/bin/guadamint-update.py
-    
-    # Copiar también la semilla a /opt/guadamint/src/
-    cp "$FILE_UPDATE" /opt/guadamint/src/guadamint-update.py
-    chmod 755 /opt/guadamint/src/guadamint-update.py
-fi
-
-echo "-> Entorno GuadaMint Update preparado con éxito."
