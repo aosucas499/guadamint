@@ -134,3 +134,35 @@ mkdir -p "$LOG_DIR"
 chmod 777 "$LOG_DIR"
 
 echo ">>> Instalación completada con éxito."
+
+# ==============================================================================
+# CONFIGURACIÓN DE ESTRUCTURA Y PERMISOS DE GUADAMINT UPDATE
+# ==============================================================================
+echo "-> Preparando entorno para GuadaMint Update..."
+
+# 1. Crear las carpetas base en /opt/guadamint si no existen
+mkdir -p /opt/guadamint/images
+mkdir -p /opt/guadamint/src
+mkdir -p /var/log/guadamint
+
+# 2. Asignar permisos a la carpeta de logs
+chmod 777 /var/log/guadamint
+
+# 3. Copiar las imágenes iniciales si se incluyen con el paquete instalador
+if [ -d "$SOURCE_DIR/images" ]; then
+    cp -r "$SOURCE_DIR/images/"* /opt/guadamint/images/ 2>/dev/null
+fi
+
+# 4. Copiar la primera versión del script semilla
+FILE_UPDATE=$(buscar_archivo "guadamint-update.py" "src")
+if [ -n "$FILE_UPDATE" ]; then
+    # Copiar a la ruta binaria del sistema
+    cp "$FILE_UPDATE" /usr/bin/guadamint-update.py
+    chmod 755 /usr/bin/guadamint-update.py
+    
+    # Copiar también la semilla a /opt/guadamint/src/
+    cp "$FILE_UPDATE" /opt/guadamint/src/guadamint-update.py
+    chmod 755 /opt/guadamint/src/guadamint-update.py
+fi
+
+echo "-> Entorno GuadaMint Update preparado con éxito."
