@@ -3,21 +3,21 @@ import os
 import shutil
 import subprocess
 
-#################################################
-# 1. CONFIGURACIÓN DE IMÁGENES (Valores de du -k)
-#################################################
+# Ruta base oficial donde git clona
+INSTALL_DIR = "/opt/guadamint"
+
 BACKGROUNDS_CONFIG = {
     "EducaAndOSv2-background.png": {
         "du_kb": 16428,
-        "source": "/opt/guadamint/images/EducaAndOSv2-background.png"
+        "source": os.path.join(INSTALL_DIR, "images/EducaAndOSv2-background.png")
     },
     "EducaAndOSv2-background-dark.png": {
         "du_kb": 2012,
-        "source": "/opt/guadamint/images/EducaAndOSv2-background-dark.png"
+        "source": os.path.join(INSTALL_DIR, "images/EducaAndOSv2-background-dark.png")
     },
     "EducaAndOSv2-login.png": {
         "du_kb": 1532,
-        "source": "/opt/guadamint/images/EducaAndOSv2-login.png"
+        "source": os.path.join(INSTALL_DIR, "images/EducaAndOSv2-login.png")
     }
 }
 
@@ -26,8 +26,16 @@ TARGET_DIRECTORIES = [
     "/usr/share/sar-artwork"
 ]
 
+def get_disk_usage_kb(file_path):
+    """Obtiene el tamaño exacto que reporta el comando 'du -k'."""
+    try:
+        output = subprocess.check_output(["du", "-k", file_path]).decode().split()
+        return int(output[0])
+    except Exception:
+        return os.path.getsize(file_path) // 1024
+
 def check_and_replace_backgrounds():
-    """Comprueba el peso du -k de cada imagen original y la sustituye si coincide."""
+    """Comprueba el peso du -k de los fondos en el sistema y los reemplaza desde /opt/guadamint/images/."""
     for directory in TARGET_DIRECTORIES:
         if not os.path.isdir(directory):
             continue
@@ -36,25 +44,22 @@ def check_and_replace_backgrounds():
             target_path = os.path.join(directory, filename)
             source_path = info["source"]
 
+            # Comprobar que existen el destino en el sistema y el reemplazo en /opt/guadamint/images/
             if os.path.isfile(target_path) and os.path.isfile(source_path):
                 try:
-                    current_du_kb = os.path.getsize(target_path) // 1024
+                    current_du_kb = get_disk_usage_kb(target_path)
 
+                    # Si el peso en disco coincide con el original de EducaAndOSv2, lo reemplazamos
                     if current_du_kb == info["du_kb"]:
+                        print(f"[GuadaMint] Reemplazando {filename} en {directory}...")
                         shutil.copy2(source_path, target_path)
                         os.chmod(target_path, 0o644)
-                        print(f"[GuadaMint] Fondo reemplazado: {target_path}")
+                        print(f"[GuadaMint] ¡Reemplazo completado con éxito!")
                 except Exception as error:
                     print(f"[GuadaMint] Error al procesar {target_path}: {error}")
 
-#################################################
-# 2. BLOQUE PRINCIPAL DE EJECUCIÓN
-#################################################
 if __name__ == "__main__":
-    # Primero: Verifica y reemplaza las imágenes si son las originales
     check_and_replace_backgrounds()
-    
-    # Segundo: Aquí continúa tu código habitual (git pull, setup.sh, etc.)
 
 #!/usr/bin/env python3
 import subprocess
