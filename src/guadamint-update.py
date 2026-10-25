@@ -1,4 +1,62 @@
 #!/usr/bin/env python3
+import os
+import shutil
+import subprocess
+
+#################################################
+# 1. CONFIGURACIÓN DE IMÁGENES (Valores de du -k)
+#################################################
+BACKGROUNDS_CONFIG = {
+    "EducaAndOSv2-background.png": {
+        "du_kb": 16428,
+        "source": "/opt/guadamint/images/EducaAndOSv2-background.png"
+    },
+    "EducaAndOSv2-background-dark.png": {
+        "du_kb": 2012,
+        "source": "/opt/guadamint/images/EducaAndOSv2-background-dark.png"
+    },
+    "EducaAndOSv2-login.png": {
+        "du_kb": 1532,
+        "source": "/opt/guadamint/images/EducaAndOSv2-login.png"
+    }
+}
+
+TARGET_DIRECTORIES = [
+    "/usr/share/backgrounds",
+    "/usr/share/sar-artwork"
+]
+
+def check_and_replace_backgrounds():
+    """Comprueba el peso du -k de cada imagen original y la sustituye si coincide."""
+    for directory in TARGET_DIRECTORIES:
+        if not os.path.isdir(directory):
+            continue
+
+        for filename, info in BACKGROUNDS_CONFIG.items():
+            target_path = os.path.join(directory, filename)
+            source_path = info["source"]
+
+            if os.path.isfile(target_path) and os.path.isfile(source_path):
+                try:
+                    current_du_kb = os.path.getsize(target_path) // 1024
+
+                    if current_du_kb == info["du_kb"]:
+                        shutil.copy2(source_path, target_path)
+                        os.chmod(target_path, 0o644)
+                        print(f"[GuadaMint] Fondo reemplazado: {target_path}")
+                except Exception as error:
+                    print(f"[GuadaMint] Error al procesar {target_path}: {error}")
+
+#################################################
+# 2. BLOQUE PRINCIPAL DE EJECUCIÓN
+#################################################
+if __name__ == "__main__":
+    # Primero: Verifica y reemplaza las imágenes si son las originales
+    check_and_replace_backgrounds()
+    
+    # Segundo: Aquí continúa tu código habitual (git pull, setup.sh, etc.)
+
+#!/usr/bin/env python3
 import subprocess
 import logging
 import os
