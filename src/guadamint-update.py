@@ -1,145 +1,89 @@
-#!/bin/bash
+#!/usr/bin/env python3
+import os
+import shutil
+import subprocess
+import logging
 
-# Comprobación de root para la INSTALACIÓN
-if [ "$EUID" -ne 0 ]; then
-  echo "Por favor, ejecuta el instalador como root (sudo ./install.sh)"
-  exit 1
-fi
+# 1. LOGS
+LOG_FILE = "/var/log/guadamint/update.log"
+os.makedirs("/var/log/guadamint", exist_ok=True)
 
-echo ">>> Instalando sistema GuadaMint (Actualizador + Tienda)..."
+logging.basicConfig(
+    filename=LOG_FILE,
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S"
+)
 
-# 0. INSTALAR DEPENDENCIAS (GIT)
-echo "Comprobando dependencias..."
-if ! command -v git &> /dev/null; then
-    echo "-> Git no encontrado. Instalando..."
-    apt-get update
-    apt-get install -y git
-    if [ $? -eq 0 ]; then
-        echo "-> Git instalado correctamente."
-    else
-        echo "¡ERROR CRÍTICO! No se pudo instalar git. El actualizador fallará."
-        exit 1
-    fi
-else
-    echo "-> Git ya está instalado. Correcto."
-fi
+# 2. CONFIGURACIÓN Y RUTAS
+INSTALL_DIR = "/opt/guadamint"
+DEST_BIN = "/usr/bin/guadamint-update.py"
+REPO_URL = "https://github.com/aosucas499/guadamint"  
+BRANCH = "eos"
 
-# 1. DEFINIR RUTAS DE ORIGEN Y DESTINO
-SOURCE_DIR=$(dirname "$0")
-
-DEST_BIN_UPDATE="/usr/bin/guadamint-update.py"  
-DEST_BIN_STORE="/usr/bin/apps-guadamint.py"
-DEST_AUTOSTART="/etc/xdg/autostart/guadamint-update.desktop"
-DEST_LAUNCHER_STORE="/usr/share/applications/apps-guadamint.desktop"
-DEST_ICON="/usr/share/icons/guadamintuz.svg"
-LOG_DIR="/var/log/guadamint"
-OPT_DIR="/opt/guadamint"
-
-# FUNCIÓN DE BÚSQUEDA INTELIGENTE
-buscar_archivo() {
-    local archivo=$1
-    local subcarpeta=$2
-    if [ -f "$SOURCE_DIR/$subcarpeta/$archivo" ]; then
-        echo "$SOURCE_DIR/$subcarpeta/$archivo"
-    elif [ -f "$SOURCE_DIR/$archivo" ]; then
-        echo "$SOURCE_DIR/$archivo"
-    else
-        echo ""
-    fi
+BACKGROUNDS_CONFIG = {
+    "EducaAndOSv2-background.png": {
+        "du_kb": 16428,
+        "source": os.path.join(INSTALL_DIR, "images/EducaAndOSv2-background.png")
+    },
+    "EducaAndOSv2-background-dark.png": {
+        "du_kb": 2012,
+        "source": os.path.join(INSTALL_DIR, "images/EducaAndOSv2-background-dark.png")
+    },
+    "EducaAndOSv2-login.png": {
+        "du_kb": 1532,
+        "source": os.path.join(INSTALL_DIR, "images/EducaAndOSv2-login.png")
+    }
 }
 
-# 2. CREAR ESTRUCTURA BASE EN /opt/guadamint
-echo "Creando directorios base en /opt/guadamint..."
-mkdir -p "$OPT_DIR/images"
-mkdir -p "$OPT_DIR/src"
+TARGET_DIRECTORIES = ["/usr/share/backgrounds", "/usr/share/sar-artwork"]
 
-# 3. COMPROBACIÓN E INSTALACIÓN DEL SUDOERS (TOGGLE / PERMISOS)
-FILE_SUDOERS=$(buscar_archivo "zz-guadamint-update" "src")
-SUDOERS_DEST="/etc/sudoers.d/zz-guadamint-update"
+def get_disk_usage_kb(file_path):
+    """Mide el tamaño exacto del archivo simulando du -k."""
+    try:
+        output = subprocess.check_output(["du", "-k", file_path]).decode().split()
+        return int(output[0])
+    except Exception:
+        return os.path.getsize(file_path) // 1024
 
-if [ -n "$FILE_SUDOERS" ]; then
-    echo "Configurando permisos sudo con $FILE_SUDOERS..."
-    cp "$FILE_SUDOERS" "$SUDOERS_DEST"
-    chown root:root "$SUDOERS_DEST"
-    chmod 0440 "$SUDOERS_DEST"
-    echo "-> Permisos sudoers configurados correctamente."
-else
-    echo "¡ERROR CRÍTICO! No se encontró el archivo 'zz-guadamint-update'."
-    exit 1
-fi
+def check_and_replace_backgrounds():
+    """Sustituye imágenes originales si coincide el tamaño du -k."""
+    for directory in TARGET_DIRECTORIES:
+        if not os.path.isdir(directory):
+            continue
 
-# 4. COPIAR IMÁGENES A /opt/guadamint/images
-if [ -d "$SOURCE_DIR/images" ]; then
-    echo "Copiando imágenes iniciales a $OPT_DIR/images/..."
-    cp -r "$SOURCE_DIR/images/"* "$OPT_DIR/images/" 2>/dev/null
-fi
+        for filename, info in BACKGROUNDS_CONFIG.items():
+            target_path = os.path.join(directory, filename)
+            source_path = info["source"]
 
-# 5. COPIAR EL SCRIPT ACTUALIZADOR (PYTHON)
-FILE_UPDATE=$(buscar_archivo "guadamint-update.py" "src")
+            if os.path.isfile(target_path) and os.path.isfile(source_path):
+                try:
+                    current_du_kb = get_disk_usage_kb(target_path)
 
-if [ -n "$FILE_UPDATE" ]; then
-    echo "Copiando actualizador a $DEST_BIN_UPDATE y $OPT_DIR/src/..."
-    cp "$FILE_UPDATE" "$DEST_BIN_UPDATE"
-    chmod 755 "$DEST_BIN_UPDATE"
-    
-    cp "$FILE_UPDATE" "$OPT_DIR/src/guadamint-update.py"
-    chmod 755 "$OPT_DIR/src/guadamint-update.py"
-else
-    echo "¡ERROR CRÍTICO! No se encuentra 'guadamint-update.py'."
-    exit 1
-fi
+                    if current_du_kb == info["du_kb"]:
+                        logging.info(f"Reemplazando {filename} en {directory}...")
+                        shutil.copy2(source_path, target_path)
+                        os.chmod(target_path, 0o644)
+                except Exception as error:
+                    logging.error(f"Error procesando {target_path}: {error}")
 
-# 6. COPIAR LA TIENDA DE APPS (PYTHON)
-FILE_STORE=$(buscar_archivo "apps-guadamint.py" "src")
+def update_from_git():
+    """Mantiene /opt/guadamint actualizado vía Git y se auto-copia a /usr/bin/."""
+    if not os.path.exists(os.path.join(INSTALL_DIR, ".git")):
+        logging.info("Clonando repositorio por primera vez...")
+        subprocess.run(["git", "clone", "-b", BRANCH, REPO_URL, INSTALL_DIR], check=False)
+    else:
+        logging.info("Ejecutando git pull...")
+        subprocess.run(["git", "-C", INSTALL_DIR, "pull"], check=False)
 
-if [ -n "$FILE_STORE" ]; then
-    echo "Copiando tienda $FILE_STORE a $DEST_BIN_STORE..."
-    cp "$FILE_STORE" "$DEST_BIN_STORE"
-    chmod 755 "$DEST_BIN_STORE"
-    
-    cp "$FILE_STORE" "$OPT_DIR/src/apps-guadamint.py" 2>/dev/null
-else
-    echo "AVISO: No se encuentra 'apps-guadamint.py'. La tienda no se instalará."
-fi
+    # Copiar última versión a /usr/bin/
+    src_script = os.path.join(INSTALL_DIR, "src/guadamint-update.py")
+    if os.path.isfile(src_script) and os.path.isfile(DEST_BIN):
+        shutil.copy2(src_script, DEST_BIN)
+        os.chmod(DEST_BIN, 0o755)
 
-# 7. COPIAR EL AUTOARRANQUE (.desktop)
-FILE_AUTOSTART=$(buscar_archivo "guadamint-update.desktop" "src")
-
-if [ -n "$FILE_AUTOSTART" ]; then
-    echo "Copiando autostart $FILE_AUTOSTART a $DEST_AUTOSTART..."
-    cp "$FILE_AUTOSTART" "$DEST_AUTOSTART"
-    chmod 644 "$DEST_AUTOSTART"
-else
-    echo "¡ERROR CRÍTICO! No se encuentra 'guadamint-update.desktop'."
-    exit 1
-fi
-
-# 8. COPIAR EL LANZADOR DE LA TIENDA (.desktop)
-FILE_LAUNCHER=$(buscar_archivo "apps-guadamint.desktop" "src")
-
-if [ -n "$FILE_LAUNCHER" ]; then
-    echo "Copiando lanzador de menú $FILE_LAUNCHER a $DEST_LAUNCHER_STORE..."
-    cp "$FILE_LAUNCHER" "$DEST_LAUNCHER_STORE"
-    chmod 644 "$DEST_LAUNCHER_STORE"
-else
-    echo "AVISO: No se encuentra 'apps-guadamint.desktop'."
-fi
-
-# 9. INSTALAR ICONO
-FILE_ICON=$(buscar_archivo "guadamintuz.svg" "images")
-if [ -z "$FILE_ICON" ]; then FILE_ICON=$(buscar_archivo "AndaTuz2.svg" "images"); fi
-
-echo "Instalando icono en $DEST_ICON..."
-if [ -n "$FILE_ICON" ]; then
-    cp "$FILE_ICON" "$DEST_ICON"
-    chmod 644 "$DEST_ICON"
-    echo "-> Icono instalado."
-else
-    echo "AVISO: No se encontró el icono (guadamintuz.svg). Se usará genérico."
-fi
-
-# 10. DIRECTORIO DE LOGS Y PERMISOS FINAL
-mkdir -p "$LOG_DIR"
-chmod 777 "$LOG_DIR"
-
-echo ">>> Instalación completada con éxito."
+if __name__ == "__main__":
+    logging.info("=== INICIO GUADAMINT UPDATE ===")
+    update_from_git()
+    check_and_replace_backgrounds()
+    logging.info("=== FIN GUADAMINT UPDATE ===")
