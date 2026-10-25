@@ -4,7 +4,9 @@ import shutil
 import subprocess
 import logging
 
-# 1. LOGS
+# ==============================================================================
+# 1. LOGS Y CONFIGURACIÓN BASE
+# ==============================================================================
 LOG_FILE = "/var/log/guadamint/update.log"
 os.makedirs("/var/log/guadamint", exist_ok=True)
 
@@ -15,12 +17,32 @@ logging.basicConfig(
     datefmt="%Y-%m-%d %H:%M:%S"
 )
 
-# 2. CONFIGURACIÓN Y RUTAS
 INSTALL_DIR = "/opt/guadamint"
-DEST_BIN = "/usr/bin/guadamint-update.py"
-REPO_URL = "https://github.com/aosucas499/guadamint"  
+REPO_URL = "https://github.com/TU_USUARIO/TU_REPO.git"  # <-- Ajusta tu URL
 BRANCH = "eos"
 
+# ==============================================================================
+# 2. LISTA DE ARCHIVOS A SINCRONIZAR EN EL SISTEMA
+# ==============================================================================
+ARCHIVOS_A_SINCRONIZAR = [
+    # (Origen en repo dentro de /opt/guadamint, Destino absoluto en el sistema, Permisos Octales)
+    
+    # Actualizador principal y Tienda
+    ("src/guadamint-update.py", "/usr/bin/guadamint-update.py", 0o755),
+    ("src/apps-guadamint.py", "/usr/bin/apps-guadamint.py", 0o755),
+    
+    # Sudoers y Lanzadores
+    ("src/zz-guadamint-update", "/etc/sudoers.d/zz-guadamint-update", 0o440),
+    ("src/guadamint-update.desktop", "/etc/xdg/autostart/guadamint-update.desktop", 0o644),
+    ("src/apps-guadamint.desktop", "/usr/share/applications/apps-guadamint.desktop", 0o644),
+    
+    # Conmutador / Toggle de actualizaciones
+    ("src/guadamint-toggle-updates.py", "/usr/bin/guadamint-toggle-updates.py", 0o755),
+    ("src/zz-guadamint-toggle-updates", "/etc/sudoers.d/zz-guadamint-toggle-updates", 0o440),
+    ("src/guadamint-autoupdate-switch.desktop", "/etc/xdg/autostart/guadamint-autoupdate-switch.desktop", 0o644),
+]
+
+# Configuración de imágenes para sustitución por du -k
 BACKGROUNDS_CONFIG = {
     "EducaAndOSv2-background.png": {
         "du_kb": 16428,
@@ -38,8 +60,10 @@ BACKGROUNDS_CONFIG = {
 
 TARGET_DIRECTORIES = ["/usr/share/backgrounds", "/usr/share/sar-artwork"]
 
+# ==============================================================================
+# 3. FUNCIONES DE DESPLIEGUE Y FONDOS
+# ==============================================================================
 def get_disk_usage_kb(file_path):
-    """Mide el tamaño exacto del archivo simulando du -k."""
     try:
         output = subprocess.check_output(["du", "-k", file_path]).decode().split()
         return int(output[0])
@@ -47,7 +71,6 @@ def get_disk_usage_kb(file_path):
         return os.path.getsize(file_path) // 1024
 
 def check_and_replace_backgrounds():
-    """Sustituye imágenes originales si coincide el tamaño du -k."""
     for directory in TARGET_DIRECTORIES:
         if not os.path.isdir(directory):
             continue
@@ -65,10 +88,34 @@ def check_and_replace_backgrounds():
                         shutil.copy2(source_path, target_path)
                         os.chmod(target_path, 0o644)
                 except Exception as error:
-                    logging.error(f"Error procesando {target_path}: {error}")
+                    logging.error(f"Error procesando fondo {target_path}: {error}")
+
+def desplegar_actualizaciones():
+    """Copia cada archivo actualizado desde /opt/guadamint a su ubicación real en el sistema."""
+    logging.info("Sincronizando archivos del repositorio hacia las rutas del sistema...")
+    for rel_src, abs_dest, mode in ARCHIVOS_A_SINCRONIZAR:
+        src_path = os.path.join(INSTALL_DIR, rel_src)
+        
+        if os.path.isfile(src_path):
+            try:
+                # Asegurar que la carpeta destino existe (útil para /etc/sudoers.d u otros)
+                os.makedirs(os.path.dirname(abs_dest), exist_ok=True)
+                
+                shutil.copy2(src_path, abs_dest)
+                os.chmod(abs_dest, mode)
+                
+                # Si es un archivo de sudoers, asegurar propietario root:root
+                if "/etc/sudoers.d/" in abs_dest:
+                    shutil.chown(abs_dest, user="root", group="root")
+                    
+                logging.info(f"Actualizado: {src_path} -> {abs_dest} (permisos: {oct(mode)})")
+            except Exception as e:
+                logging.error(f"Error al copiar {src_path} a {abs_dest}: {e}")
+        else:
+            logging.warning(f"Archivo omitido (no existe en repo): {src_path}")
 
 def update_from_git():
-    """Mantiene /opt/guadamint actualizado vía Git y se auto-copia a /usr/bin/."""
+    """Actualiza /opt/guadamint vía Git y ejecuta el despliegue de archivos."""
     if not os.path.exists(os.path.join(INSTALL_DIR, ".git")):
         logging.info("Clonando repositorio por primera vez...")
         subprocess.run(["git", "clone", "-b", BRANCH, REPO_URL, INSTALL_DIR], check=False)
@@ -76,12 +123,12 @@ def update_from_git():
         logging.info("Ejecutando git pull...")
         subprocess.run(["git", "-C", INSTALL_DIR, "pull"], check=False)
 
-    # Copiar última versión a /usr/bin/
-    src_script = os.path.join(INSTALL_DIR, "src/guadamint-update.py")
-    if os.path.isfile(src_script) and os.path.isfile(DEST_BIN):
-        shutil.copy2(src_script, DEST_BIN)
-        os.chmod(DEST_BIN, 0o755)
+    # Tras actualizar el repositorio local, desplegamos los cambios al sistema
+    desplegar_actualizaciones()
 
+# ==============================================================================
+# 4. EJECUCIÓN PRINCIPAL
+# ==============================================================================
 if __name__ == "__main__":
     logging.info("=== INICIO GUADAMINT UPDATE ===")
     update_from_git()
