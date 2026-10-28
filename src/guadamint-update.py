@@ -150,7 +150,7 @@ def update_from_git():
     if se_requiere_reinicio and '--restarted' not in sys.argv:
         logging.info("Reejecutando script con el nuevo código...")
         os.execv(sys.executable, [sys.executable, SCRIPT_BIN_PATH, '--restarted'])
-        
+
 # ==============================================================================
 # 4. EJECUCIÓN PRINCIPAL
 # ==============================================================================
