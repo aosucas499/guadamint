@@ -31,36 +31,47 @@ if os.geteuid() == 0 and not os.path.exists(os.path.dirname(LOG_FILE)):
 # --- CATÁLOGO DE APLICACIONES ---
 CATALOGO = [
     {
-        "categoria": "Aplicaciones Obligatorias",
+        "categoria": "Aplicaciones",
         "apps": [
             {"id": "vlc", "nombre": "VLC Media Player", "desc": "Reproductor multimedia de ejemplo", "icono": "vlc"},
             {"id": "openboard", "nombre": "Openboard", "desc": "Aplicación de pizarra interactiva", "icono": "openboard"},
         ]
     },
     {
-        "categoria": "Hardware y Controladores",
+        "categoria": "Scripts y Configuraciones",
         "apps": [
-            {"id": "smart-product-drivers", "nombre": "Drivers SMART Board", "desc": "Controladores para pizarras interactivas", "icono": "video-display", "script_install": "instalar_smartboard.sh"},
+            {
+                "id": "ubuntu-repos", 
+                "nombre": "Repositorios Temporales de Ubuntu", 
+                "desc": "Permite dependencias oficiales extra en RAM (/tmp). Se borran al reiniciar.", 
+                "icono": "system-software-update", 
+                "script_install": "toggle-ubuntu-repos.sh"
+            },
+            {
+                "id": "smart-product-drivers", 
+                "nombre": "Drivers SMART Board", 
+                "desc": "Controladores para pizarras interactivas", 
+                "icono": "video-display", 
+                "script_install": "instalar_smartboard.sh"
+            },
+            {
+                "id": "flatpak", 
+                "nombre": "Soporte Flatpak y Flathub", 
+                "desc": "Instala el motor Flatpak y lo integra automáticamente en el Centro de Software", 
+                "icono": "system-software-install", 
+                "script_install": "toggle-flatpak.sh"
+            },
         ]
     }
 ]
 
-# --- AUTO-UPDATE CONFIG ---
+# --- AUTO-UPDATE CONFIG Y RUTAS ---
 REPO_DIR = "/opt/guadamint"
 REPO_URL = "https://github.com/aosucas499/guadamint.git"
 REPO_BRANCH = "eos"
 SCRIPT_SRC = os.path.join(REPO_DIR, "src/apps-guadamint.py")
 SCRIPT_BIN = "/usr/bin/apps-guadamint.py"
 RUTA_SCRIPTS_REPO = "/opt/guadamint/src/scripts"
-
-# --- SCRIPT DE REPOSITORIOS TEMPORALES ---
-SCRIPT_REPOS = os.path.join(RUTA_SCRIPTS_REPO, "toggle-ubuntu-repos.sh")
-
-def esta_repo_temporal_activo():
-    if os.path.exists(SCRIPT_REPOS):
-        res = subprocess.run(["/bin/bash", SCRIPT_REPOS, "status"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        return res.returncode == 0
-    return False
 
 # ==============================================================================
 # SISTEMA DE LOGS
@@ -118,12 +129,13 @@ def hay_bloqueo_apt():
 def auto_update():
     if not os.access(SCRIPT_BIN, os.W_OK): return
     try:
-        if not os.path.exists(REPO_DIR):
+        git_dir = os.path.join(REPO_DIR, ".git")
+        if not os.path.exists(REPO_DIR) or not os.path.exists(git_dir):
+            if os.path.exists(REPO_DIR): shutil.rmtree(REPO_DIR)
             subprocess.run(["git", "clone", "-b", REPO_BRANCH, REPO_URL, REPO_DIR], check=True)
         else:
-            os.chdir(REPO_DIR)
-            subprocess.run(["git", "fetch", "origin"], check=True, stderr=subprocess.DEVNULL)
-            subprocess.run(["git", "reset", "--hard", f"origin/{REPO_BRANCH}"], check=True, stderr=subprocess.DEVNULL)
+            subprocess.run(["git", "-C", REPO_DIR, "fetch", "origin"], check=True, stderr=subprocess.DEVNULL)
+            subprocess.run(["git", "-C", REPO_DIR, "reset", "--hard", f"origin/{REPO_BRANCH}"], check=True, stderr=subprocess.DEVNULL)
         
         if os.path.exists(SCRIPT_SRC) and os.path.realpath(__file__) != os.path.realpath(SCRIPT_SRC):
             with open(SCRIPT_SRC, 'rb') as f1, open(SCRIPT_BIN, 'rb') as f2:
@@ -132,7 +144,8 @@ def auto_update():
                     shutil.copy2(SCRIPT_SRC, SCRIPT_BIN)
                     os.chmod(SCRIPT_BIN, 0o755)
                     os.execv(sys.executable, [sys.executable] + sys.argv)
-    except: pass
+    except Exception as e:
+        log(f"Error en auto_update: {e}")
 
 # ==============================================================================
 # INTERFAZ GRÁFICA
@@ -182,12 +195,19 @@ class FilaApp(Gtk.ListBoxRow):
         threading.Thread(target=self.check_installed).start()
 
     def check_installed(self):
+        is_installed = False
         try:
-            res = subprocess.run(
-                ["dpkg-query", "-W", "--showformat=${Status}", self.pkg_name], 
-                stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True
-            )
-            is_installed = "install ok installed" in res.stdout
+            if "script_install" in self.app_data:
+                ruta_script = os.path.join(RUTA_SCRIPTS_REPO, self.app_data["script_install"])
+                if os.path.exists(ruta_script):
+                    res = subprocess.run(["/bin/bash", ruta_script, "status"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                    is_installed = (res.returncode == 0)
+            else:
+                res = subprocess.run(
+                    ["dpkg-query", "-W", "--showformat=${Status}", self.pkg_name], 
+                    stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True
+                )
+                is_installed = "install ok installed" in res.stdout
         except:
             is_installed = False
             
@@ -230,12 +250,13 @@ class FilaApp(Gtk.ListBoxRow):
         success = False
         cmd = []
         
-        if action == "install" and "script_install" in self.app_data:
+        if "script_install" in self.app_data:
             nombre_script = self.app_data["script_install"]
             ruta_script = os.path.join(RUTA_SCRIPTS_REPO, nombre_script)
             if os.path.exists(ruta_script):
                 os.chmod(ruta_script, 0o755)
-                cmd = ["/bin/bash", ruta_script]
+                param = "enable" if action == "install" else "disable"
+                cmd = ["/bin/bash", ruta_script, param]
             else:
                 error_msg = f"Script no encontrado: {ruta_script}"
         else:
@@ -252,14 +273,14 @@ class FilaApp(Gtk.ListBoxRow):
                 
                 full_log = ""
                 for line in process.stdout:
-                    log(f"[APT] {line.strip()}")
+                    log(f"[EXEC] {line.strip()}")
                     full_log += line
                 
                 process.wait()
                 
                 if process.returncode == 0:
                     success = True
-                    log("Comando APT completado con éxito.")
+                    log("Comando completado con éxito.")
                 else:
                     log(f"Error (Código {process.returncode})")
                     if "Unable to locate" in full_log: error_msg = f"Paquete no encontrado."
@@ -269,22 +290,7 @@ class FilaApp(Gtk.ListBoxRow):
                 log(f"Excepción Python: {e}")
                 error_msg = str(e)
 
-        try:
-            res = subprocess.run(
-                ["dpkg-query", "-W", "--showformat=${Status}", self.pkg_name], 
-                stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True
-            )
-            actual_state = "install ok installed" in res.stdout
-        except:
-            actual_state = False
-            
-        intended = (action == "install")
-        if success and (actual_state != intended):
-            log(f"AVISO: apt-get terminó bien, pero {self.pkg_name} no quedó en estado {action}. Revirtiendo.")
-            success = False
-            if not error_msg: error_msg = "El paquete no se instaló/desinstaló correctamente."
-
-        GLib.idle_add(self.finish_action, success, intended, error_msg)
+        GLib.idle_add(self.finish_action, success, (action == "install"), error_msg)
 
     def finish_action(self, success, intended_state, error_msg=""):
         self.spinner.stop()
@@ -348,36 +354,6 @@ class GuadaStoreWindow(Gtk.Window):
         self.main_box.set_border_width(15)
         scrolled.add(self.main_box)
 
-        # --- TARJETA REPOSITORIOS TEMPORALES (LLAMA A toggle-ubuntu-repos.sh) ---
-        repo_card = Gtk.Frame()
-        repo_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
-        repo_box.set_border_width(10)
-
-        repo_info_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
-        repo_title = Gtk.Label(xalign=0)
-        repo_title.set_markup("<b>Repositorios Temporales de Ubuntu</b>")
-        repo_desc = Gtk.Label(label="Permite dependencias oficiales extra. Se borran automáticamente al reiniciar.", xalign=0)
-        repo_desc.get_style_context().add_class("dim-label")
-        repo_desc.set_max_width_chars(45)
-        repo_desc.set_line_wrap(True)
-
-        repo_info_box.pack_start(repo_title, False, False, 0)
-        repo_info_box.pack_start(repo_desc, False, False, 0)
-
-        self.switch_repo = Gtk.Switch()
-        self.switch_repo.set_valign(Gtk.Align.CENTER)
-        self.switch_repo.set_active(esta_repo_temporal_activo())
-        self.repo_handler_id = self.switch_repo.connect("state-set", self.on_toggle_repo_state)
-
-        self.repo_spinner = Gtk.Spinner()
-
-        repo_box.pack_start(repo_info_box, True, True, 0)
-        repo_box.pack_end(self.switch_repo, False, False, 0)
-        repo_box.pack_end(self.repo_spinner, False, False, 5)
-        repo_card.add(repo_box)
-        
-        self.main_box.pack_start(repo_card, False, False, 0)
-
         # --- CATÁLOGO DE APLICACIONES ---
         self.rows = []
         for seccion in CATALOGO:
@@ -397,36 +373,6 @@ class GuadaStoreWindow(Gtk.Window):
                 self.rows.append(row)
             
             self.main_box.pack_start(listbox, False, False, 0)
-
-    def on_toggle_repo_state(self, switch, state):
-        if hay_bloqueo_apt():
-            dialog = Gtk.MessageDialog(parent=self, flags=Gtk.DialogFlags.MODAL, message_type=Gtk.MessageType.ERROR, buttons=Gtk.ButtonsType.OK, text="Aviso")
-            dialog.format_secondary_text("Sistema ocupado (APT bloqueado).\nInténtalo en un minuto.")
-            dialog.run()
-            dialog.destroy()
-            return True
-
-        self.switch_repo.set_sensitive(False)
-        self.repo_spinner.start()
-
-        def worker():
-            accion = "enable" if state else "disable"
-            if os.path.exists(SCRIPT_REPOS):
-                os.chmod(SCRIPT_REPOS, 0o755)
-                subprocess.run(["/bin/bash", SCRIPT_REPOS, accion])
-            
-            GLib.idle_add(self.finish_toggle_repo, True, state)
-
-        threading.Thread(target=worker, daemon=True).start()
-        return True
-
-    def finish_toggle_repo(self, success, intended_state):
-        self.repo_spinner.stop()
-        self.switch_repo.set_sensitive(True)
-        if not success:
-            self.switch_repo.handler_block(self.repo_handler_id)
-            self.switch_repo.set_active(not intended_state)
-            self.switch_repo.handler_unblock(self.repo_handler_id)
 
     def refresh_all(self, widget):
         for row in self.rows:
