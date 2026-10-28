@@ -126,12 +126,22 @@ def desplegar_actualizaciones():
 
 def update_from_git():
     """Actualiza /opt/guadamint vía Git y ejecuta el despliegue de archivos."""
-    if not os.path.exists(os.path.join(INSTALL_DIR, ".git")):
-        logging.info("Clonando repositorio por primera vez...")
+    git_dir = os.path.join(INSTALL_DIR, ".git")
+
+    # Si la carpeta no existe O si existe pero NO tiene la carpeta .git (copia local de la ISO)
+    if not os.path.exists(INSTALL_DIR) or not os.path.exists(git_dir):
+        logging.info(f"Carpeta {INSTALL_DIR} no válida o sin .git. Limpiando y clonando de cero...")
+        
+        # 1. Eliminamos el directorio de forma radical para evitar el error de 'directorio no vacío'
+        if os.path.exists(INSTALL_DIR):
+            shutil.rmtree(INSTALL_DIR)
+            
+        # 2. Clonamos limpiamente la rama objetivo desde GitHub
         subprocess.run(["git", "clone", "-b", BRANCH, REPO_URL, INSTALL_DIR], check=False)
     else:
-        logging.info("Ejecutando git pull...")
-        subprocess.run(["git", "-C", INSTALL_DIR, "pull"], check=False)
+        logging.info("Sincronizando repositorio Git existente...")
+        subprocess.run(["git", "-C", INSTALL_DIR, "fetch", "origin"], check=False)
+        subprocess.run(["git", "-C", INSTALL_DIR, "reset", "--hard", f"origin/{BRANCH}"], check=False)
 
     # Tras actualizar el repositorio local, desplegamos los cambios al sistema
     se_requiere_reinicio = desplegar_actualizaciones()
