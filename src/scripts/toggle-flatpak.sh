@@ -1,38 +1,45 @@
 #!/bin/bash
 
+# Ruta al script de repositorios temporales
 TOGGLE_REPOS="/opt/guadamint/src/scripts/toggle-ubuntu-repos.sh"
 
+# Función para comprobar si Flatpak está instalado
 esta_instalado() {
     command -v flatpak >/dev/null 2>&1
 }
 
 case "$1" in
     enable)
-        if [ -x "$TOGGLE_REPOS" ]; then
-            "$TOGGLE_REPOS" enable
+        # 1. Habilitar repositorios con bash (incluso si no tiene +x aún)
+        if [ -f "$TOGGLE_REPOS" ]; then
+            bash "$TOGGLE_REPOS" enable
         fi
 
+        # 2. Actualizar e instalar paquetes
         export DEBIAN_FRONTEND=noninteractive
-        apt-get update -qq
-        apt-get install -y -qq flatpak gnome-software-plugin-flatpak
+        apt-get update -y
+        apt-get install -y flatpak gnome-software-plugin-flatpak
+
+        # 3. Añadir el repositorio oficial Flathub
         flatpak remote-add --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
 
-        if [ -x "$TOGGLE_REPOS" ]; then
-            "$TOGGLE_REPOS" disable
+        # 4. Desactivar repositorios temporales y limpiar RAM
+        if [ -f "$TOGGLE_REPOS" ]; then
+            bash "$TOGGLE_REPOS" disable
         fi
         ;;
 
     disable)
-        if [ -x "$TOGGLE_REPOS" ]; then
-            "$TOGGLE_REPOS" enable
+        if [ -f "$TOGGLE_REPOS" ]; then
+            bash "$TOGGLE_REPOS" enable
         fi
 
         flatpak remote-delete flathub --force 2>/dev/null
-        apt-get purge -y -qq flatpak gnome-software-plugin-flatpak
-        apt-get autoremove -y -qq
+        apt-get purge -y flatpak gnome-software-plugin-flatpak
+        apt-get autoremove -y
 
-        if [ -x "$TOGGLE_REPOS" ]; then
-            "$TOGGLE_REPOS" disable
+        if [ -f "$TOGGLE_REPOS" ]; then
+            bash "$TOGGLE_REPOS" disable
         fi
         ;;
 
