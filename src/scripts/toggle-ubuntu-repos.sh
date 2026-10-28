@@ -1,9 +1,8 @@
 #!/bin/bash
-
 TEMP_REPO_FILE="/tmp/ubuntu-temp.list"
 SYMLINK_REPO_FILE="/etc/apt/sources.list.d/ubuntu-temp.list"
 
-# Crear el enlace simbólico si no existe
+# Asegurar enlace simbólico permanente en APT
 if [ ! -L "$SYMLINK_REPO_FILE" ]; then
     ln -sf "$TEMP_REPO_FILE" "$SYMLINK_REPO_FILE"
 fi
@@ -17,14 +16,15 @@ case "$1" in
         apt-get update -qq
         ;;
     disable)
+        # Eliminación explícita del archivo
         rm -f "$TEMP_REPO_FILE"
         apt-get update -qq
         ;;
     status)
         if [ -s "$TEMP_REPO_FILE" ]; then
-            exit 0 # Activo
+            exit 0
         else
-            exit 1 # Inactivo
+            exit 1
         fi
         ;;
     *)
