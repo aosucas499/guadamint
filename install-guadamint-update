@@ -6,16 +6,15 @@ if [ "$EUID" -ne 0 ]; then
   exit 1
 fi
 
-echo ">>> Instalando sistema GuadaMint (Actualizador + Tienda)..."
+echo ">>> Instalando sistema GuadaMint (Actualizador + Tienda + Toggle)..."
 
 # 0. INSTALAR DEPENDENCIAS (GIT)
 echo "Comprobando dependencias..."
 if ! command -v git &> /dev/null; then
-    echo "-> Git no encontrado. Instalando..."
+    echo "-> Git no encontrado. Intentando instalar..."
     apt-get update && apt-get install -y git
     if [ $? -ne 0 ]; then
-        echo "¡ERROR CRÍTICO! No se pudo instalar git. El actualizador fallará."
-        exit 1
+        echo "¡AVISO! No se pudo instalar git vía apt. Se dependerá de los paquetes preinstalados."
     fi
 fi
 
@@ -24,8 +23,12 @@ SOURCE_DIR=$(dirname "$0")
 
 DEST_BIN_UPDATE="/usr/bin/guadamint-update.py"  
 DEST_BIN_STORE="/usr/bin/apps-guadamint.py"
-DEST_AUTOSTART="/etc/xdg/autostart/guadamint-update.desktop"
+DEST_BIN_TOGGLE="/usr/bin/guadamint-toggle-updates.py"
+
+DEST_AUTOSTART_UPDATE="/etc/xdg/autostart/guadamint-update.desktop"
+DEST_AUTOSTART_TOGGLE="/etc/xdg/autostart/guadamint-autoupdate-switch.desktop"
 DEST_LAUNCHER_STORE="/usr/share/applications/apps-guadamint.desktop"
+
 DEST_ICON="/usr/share/icons/guadamintuz.svg"
 LOG_DIR="/var/log/guadamint"
 OPT_DIR="/opt/guadamint"
@@ -43,69 +46,84 @@ buscar_archivo() {
     fi
 }
 
-# 2. CREAR ESTRUCTURA BASE EN /opt/guadamint
+# 2. CREAR ESTRUCTURA BASE EN /opt/guadamint Y COPIAR 'src' COMPLETO
 echo "Creando directorios base en /opt/guadamint..."
 mkdir -p "$OPT_DIR/images"
 mkdir -p "$OPT_DIR/src"
 
-# 3. COMPROBACIÓN E INSTALACIÓN DEL SUDOERS (PERMISOS)
-FILE_SUDOERS=$(buscar_archivo "zz-guadamint-update" "src")
-SUDOERS_DEST="/etc/sudoers.d/zz-guadamint-update"
-
-if [ -n "$FILE_SUDOERS" ]; then
-    echo "Configurando permisos sudo con $FILE_SUDOERS..."
-    cp "$FILE_SUDOERS" "$SUDOERS_DEST"
-    chown root:root "$SUDOERS_DEST"
-    chmod 0440 "$SUDOERS_DEST"
-else
-    echo "¡ERROR CRÍTICO! No se encontró el archivo 'zz-guadamint-update'."
-    exit 1
+if [ -d "$SOURCE_DIR/src" ]; then
+    echo "Copiando todos los fuentes a $OPT_DIR/src/..."
+    cp -r "$SOURCE_DIR/src/"* "$OPT_DIR/src/" 2>/dev/null
 fi
 
-# 4. COPIAR IMÁGENES INICIALES A /opt/guadamint/images/
 if [ -d "$SOURCE_DIR/images" ]; then
     echo "Copiando imágenes iniciales a $OPT_DIR/images/..."
     cp -r "$SOURCE_DIR/images/"* "$OPT_DIR/images/" 2>/dev/null
 fi
 
-# 5. COPIAR EL SCRIPT ACTUALIZADOR (PYTHON)
-FILE_UPDATE=$(buscar_archivo "guadamint-update.py" "src")
-
-if [ -n "$FILE_UPDATE" ]; then
-    echo "Copiando actualizador a $DEST_BIN_UPDATE y $OPT_DIR/src/..."
-    cp "$FILE_UPDATE" "$DEST_BIN_UPDATE"
-    chmod 755 "$DEST_BIN_UPDATE"
-    
-    cp "$FILE_UPDATE" "$OPT_DIR/src/guadamint-update.py"
-    chmod 755 "$OPT_DIR/src/guadamint-update.py"
-else
-    echo "¡ERROR CRÍTICO! No se encuentra 'guadamint-update.py'."
-    exit 1
+# 3. COMPROBACIÓN E INSTALACIÓN DE SUDOERS (ACTUALIZADOR Y TOGGLE)
+# 3.1 Sudoers Actualizador
+FILE_SUDOERS_UPDATE=$(buscar_archivo "zz-guadamint-update" "src")
+if [ -n "$FILE_SUDOERS_UPDATE" ]; then
+    cp "$FILE_SUDOERS_UPDATE" "/etc/sudoers.d/zz-guadamint-update"
+    chown root:root "/etc/sudoers.d/zz-guadamint-update"
+    chmod 0440 "/etc/sudoers.d/zz-guadamint-update"
+    echo "-> Permisos sudoers (update) configurados."
 fi
 
-# 6. COPIAR LA TIENDA DE APPS (PYTHON)
-FILE_STORE=$(buscar_archivo "apps-guadamint.py" "src")
+# 3.2 Sudoers Toggle
+FILE_SUDOERS_TOGGLE=$(buscar_archivo "zz-guadamint-toggle-updates" "src")
+if [ -n "$FILE_SUDOERS_TOGGLE" ]; then
+    cp "$FILE_SUDOERS_TOGGLE" "/etc/sudoers.d/zz-guadamint-toggle-updates"
+    chown root:root "/etc/sudoers.d/zz-guadamint-toggle-updates"
+    chmod 0440 "/etc/sudoers.d/zz-guadamint-toggle-updates"
+    echo "-> Permisos sudoers (toggle) configurados."
+fi
 
+# 4. INSTALAR EJECUTABLES EN /usr/bin/
+# 4.1 Actualizador
+FILE_UPDATE=$(buscar_archivo "guadamint-update.py" "src")
+if [ -n "$FILE_UPDATE" ]; then
+    cp "$FILE_UPDATE" "$DEST_BIN_UPDATE"
+    chmod 755 "$DEST_BIN_UPDATE"
+fi
+
+# 4.2 Tienda
+FILE_STORE=$(buscar_archivo "apps-guadamint.py" "src")
 if [ -n "$FILE_STORE" ]; then
     cp "$FILE_STORE" "$DEST_BIN_STORE"
     chmod 755 "$DEST_BIN_STORE"
-    cp "$FILE_STORE" "$OPT_DIR/src/apps-guadamint.py" 2>/dev/null
 fi
 
-# 7. COPIAR AUTOARRANQUE Y LANZADOR (.desktop)
-FILE_AUTOSTART=$(buscar_archivo "guadamint-update.desktop" "src")
-if [ -n "$FILE_AUTOSTART" ]; then
-    cp "$FILE_AUTOSTART" "$DEST_AUTOSTART"
-    chmod 644 "$DEST_AUTOSTART"
+# 4.3 Toggle
+FILE_TOGGLE=$(buscar_archivo "guadamint-toggle-updates.py" "src")
+if [ -n "$FILE_TOGGLE" ]; then
+    cp "$FILE_TOGGLE" "$DEST_BIN_TOGGLE"
+    chmod 755 "$DEST_BIN_TOGGLE"
+    echo "-> Binario toggle instalado en /usr/bin/."
 fi
 
-FILE_LAUNCHER=$(buscar_archivo "apps-guadamint.desktop" "src")
-if [ -n "$FILE_LAUNCHER" ]; then
-    cp "$FILE_LAUNCHER" "$DEST_LAUNCHER_STORE"
+# 5. INSTALAR AUTOARRANQUES Y LANZADORES (.desktop)
+FILE_AUTOSTART_UPD=$(buscar_archivo "guadamint-update.desktop" "src")
+if [ -n "$FILE_AUTOSTART_UPD" ]; then
+    cp "$FILE_AUTOSTART_UPD" "$DEST_AUTOSTART_UPDATE"
+    chmod 644 "$DEST_AUTOSTART_UPDATE"
+fi
+
+FILE_AUTOSTART_TOG=$(buscar_archivo "guadamint-autoupdate-switch.desktop" "src")
+if [ -n "$FILE_AUTOSTART_TOG" ]; then
+    cp "$FILE_AUTOSTART_TOG" "$DEST_AUTOSTART_TOGGLE"
+    chmod 644 "$DEST_AUTOSTART_TOGGLE"
+    echo "-> Autostart de toggle instalado."
+fi
+
+FILE_LAUNCHER_STORE=$(buscar_archivo "apps-guadamint.desktop" "src")
+if [ -n "$FILE_LAUNCHER_STORE" ]; then
+    cp "$FILE_LAUNCHER_STORE" "$DEST_LAUNCHER_STORE"
     chmod 644 "$DEST_LAUNCHER_STORE"
 fi
 
-# 8. INSTALAR ICONO
+# 6. INSTALAR ICONO
 FILE_ICON=$(buscar_archivo "guadamintuz.svg" "images")
 if [ -z "$FILE_ICON" ]; then FILE_ICON=$(buscar_archivo "AndaTuz2.svg" "images"); fi
 if [ -n "$FILE_ICON" ]; then
@@ -113,7 +131,7 @@ if [ -n "$FILE_ICON" ]; then
     chmod 644 "$DEST_ICON"
 fi
 
-# 9. CREAR CARPETA DE LOGS CON PERMISOS
+# 7. CARPETA DE LOGS CON PERMISOS DE ESCRITURA
 mkdir -p "$LOG_DIR"
 chmod 777 "$LOG_DIR"
 
