@@ -34,7 +34,7 @@ CATALOGO = [
         "categoria": "Aplicaciones Obligatorias",
         "apps": [
             {"id": "vlc", "nombre": "VLC Media Player", "desc": "Reproductor multimedia de ejemplo", "icono": "vlc"},
-             {"id": "openboard", "nombre": "Openboard", "desc": "Aplicación de pizarra interactiva", "icono": "openboard"},
+            {"id": "openboard", "nombre": "Openboard", "desc": "Aplicación de pizarra interactiva", "icono": "openboard"},
         ]
     },
     {
@@ -52,6 +52,15 @@ REPO_BRANCH = "eos"
 SCRIPT_SRC = os.path.join(REPO_DIR, "src/apps-guadamint.py")
 SCRIPT_BIN = "/usr/bin/apps-guadamint.py"
 RUTA_SCRIPTS_REPO = "/opt/guadamint/src/scripts"
+
+# --- SCRIPT DE REPOSITORIOS TEMPORALES ---
+SCRIPT_REPOS = os.path.join(RUTA_SCRIPTS_REPO, "toggle-ubuntu-repos.sh")
+
+def esta_repo_temporal_activo():
+    if os.path.exists(SCRIPT_REPOS):
+        res = subprocess.run(["/bin/bash", SCRIPT_REPOS, "status"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        return res.returncode == 0
+    return False
 
 # ==============================================================================
 # SISTEMA DE LOGS
@@ -339,6 +348,37 @@ class GuadaStoreWindow(Gtk.Window):
         self.main_box.set_border_width(15)
         scrolled.add(self.main_box)
 
+        # --- TARJETA REPOSITORIOS TEMPORALES (LLAMA A toggle-ubuntu-repos.sh) ---
+        repo_card = Gtk.Frame()
+        repo_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
+        repo_box.set_border_width(10)
+
+        repo_info_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
+        repo_title = Gtk.Label(xalign=0)
+        repo_title.set_markup("<b>Repositorios Temporales de Ubuntu</b>")
+        repo_desc = Gtk.Label(label="Permite dependencias oficiales extra. Se borran automáticamente al reiniciar.", xalign=0)
+        repo_desc.get_style_context().add_class("dim-label")
+        repo_desc.set_max_width_chars(45)
+        repo_desc.set_line_wrap(True)
+
+        repo_info_box.pack_start(repo_title, False, False, 0)
+        repo_info_box.pack_start(repo_desc, False, False, 0)
+
+        self.switch_repo = Gtk.Switch()
+        self.switch_repo.set_valign(Gtk.Align.CENTER)
+        self.switch_repo.set_active(esta_repo_temporal_activo())
+        self.repo_handler_id = self.switch_repo.connect("state-set", self.on_toggle_repo_state)
+
+        self.repo_spinner = Gtk.Spinner()
+
+        repo_box.pack_start(repo_info_box, True, True, 0)
+        repo_box.pack_end(self.switch_repo, False, False, 0)
+        repo_box.pack_end(self.repo_spinner, False, False, 5)
+        repo_card.add(repo_box)
+        
+        self.main_box.pack_start(repo_card, False, False, 0)
+
+        # --- CATÁLOGO DE APLICACIONES ---
         self.rows = []
         for seccion in CATALOGO:
             lbl_sec = Gtk.Label(label=seccion["categoria"], xalign=0)
@@ -357,6 +397,36 @@ class GuadaStoreWindow(Gtk.Window):
                 self.rows.append(row)
             
             self.main_box.pack_start(listbox, False, False, 0)
+
+    def on_toggle_repo_state(self, switch, state):
+        if hay_bloqueo_apt():
+            dialog = Gtk.MessageDialog(parent=self, flags=Gtk.DialogFlags.MODAL, message_type=Gtk.MessageType.ERROR, buttons=Gtk.ButtonsType.OK, text="Aviso")
+            dialog.format_secondary_text("Sistema ocupado (APT bloqueado).\nInténtalo en un minuto.")
+            dialog.run()
+            dialog.destroy()
+            return True
+
+        self.switch_repo.set_sensitive(False)
+        self.repo_spinner.start()
+
+        def worker():
+            accion = "enable" if state else "disable"
+            if os.path.exists(SCRIPT_REPOS):
+                os.chmod(SCRIPT_REPOS, 0o755)
+                subprocess.run(["/bin/bash", SCRIPT_REPOS, accion])
+            
+            GLib.idle_add(self.finish_toggle_repo, True, state)
+
+        threading.Thread(target=worker, daemon=True).start()
+        return True
+
+    def finish_toggle_repo(self, success, intended_state):
+        self.repo_spinner.stop()
+        self.switch_repo.set_sensitive(True)
+        if not success:
+            self.switch_repo.handler_block(self.repo_handler_id)
+            self.switch_repo.set_active(not intended_state)
+            self.switch_repo.handler_unblock(self.repo_handler_id)
 
     def refresh_all(self, widget):
         for row in self.rows:
