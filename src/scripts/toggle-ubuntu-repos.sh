@@ -3,12 +3,11 @@
 TEMP_REPO_FILE="/tmp/ubuntu-temp.list"
 SYMLINK_REPO_FILE="/etc/apt/sources.list.d/ubuntu-temp.list"
 
-# 1. Asegurar el enlace simbólico permanente si no existe
+# Crear el enlace simbólico si no existe
 if [ ! -L "$SYMLINK_REPO_FILE" ]; then
     ln -sf "$TEMP_REPO_FILE" "$SYMLINK_REPO_FILE"
 fi
 
-# 2. Según el argumento ($1), activar o desactivar
 case "$1" in
     enable)
         echo "# Repositorios temporales de Ubuntu en RAM (/tmp)" > "$TEMP_REPO_FILE"
