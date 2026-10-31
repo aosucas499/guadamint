@@ -18,7 +18,7 @@ case "$1" in
         # 2. Actualizar e instalar paquetes
         export DEBIAN_FRONTEND=noninteractive
         apt-get update -y
-        apt-get install -y flatpak 
+        apt-get install -y flatpak libflatpak0
         cd "$(dirname "$0")"
         dpkg -i gnome-software-plugin-flatpak_47.0-1-SAR_amd64.deb
 
