@@ -21,7 +21,7 @@ case "$1" in
 
         if [ -d "$TEMP_DIR" ]; then
             cd "$TEMP_DIR" || exit 1
-            chmod +x install-oracular
+            chmod +x install-eos2
             ./install-oracular
             cd /tmp || exit 1
             rm -rf "$TEMP_DIR"
