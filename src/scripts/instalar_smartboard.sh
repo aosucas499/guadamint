@@ -10,9 +10,9 @@ esta_instalado() {
 case "$1" in
     enable|install)
         # 1. Habilitar repositorios temporales de Ubuntu por si faltan dependencias (docker.io, etc.)
-        if [ -f "$TOGGLE_REPOS" ]; then
-            bash "$TOGGLE_REPOS" enable
-        fi
+        #if [ -f "$TOGGLE_REPOS" ]; then
+        #    bash "$TOGGLE_REPOS" enable
+        #fi
 
         # 2. Clonar e instalar desde el repositorio oficial de SMART
         TEMP_DIR="/tmp/smartdre_install"
