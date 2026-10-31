@@ -18,7 +18,8 @@ case "$1" in
         # 2. Actualizar e instalar paquetes
         export DEBIAN_FRONTEND=noninteractive
         apt-get update -y
-        apt-get install -y flatpak gnome-software-plugin-flatpak
+        apt-get install -y flatpak 
+        #apt-get install -y gnome-software-plugin-flatpak
 
         # 3. Añadir el repositorio oficial Flathub
         flatpak remote-add --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
