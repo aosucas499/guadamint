@@ -44,7 +44,7 @@ CATALOGO = [
                 "id": "ubuntu-repos", 
                 "nombre": "Repositorios Temporales de Ubuntu", 
                 "desc": "Permite dependencias oficiales extra en RAM (/tmp). Se borran al reiniciar.", 
-                "icono": "system-software-update", 
+                "icono": "ubuntu-logo", 
                 "script_install": "toggle-ubuntu-repos.sh"
             },
             {
