@@ -1,44 +1,72 @@
 #!/bin/bash
 
-# Colores para la terminal
-AZUL="\033[1;34m"
-VERDE="\033[1;32m"
-NORMAL="\033[0m"
+TOGGLE_REPOS="/opt/guadamint/src/scripts/toggle-ubuntu-repos.sh"
 
-echo -e "${AZUL}====================================================${NORMAL}"
-echo -e "${AZUL}   INSTALADOR SMARTBOARD PARA GUADAMINT / UBUNTU    ${NORMAL}"
-echo -e "${AZUL}====================================================${NORMAL}"
-
-# 1. Definir la función de instalación
-function installSmartdre {
-    echo -e "${VERDE}Preparando descarga desde el repositorio...${NORMAL}"
-    
-    # Limpiamos instalaciones previas del repositorio para evitar errores de git
-    if [ -d "smartdre" ]; then
-        echo "Eliminando carpeta smartdre temporal existente..."
-        sudo rm -rf smartdre
-    fi
-
-    # Clonar el repositorio
-    git clone https://github.com/aosucas499/smartdre.git
-    
-    # Entrar y ejecutar el instalador específico para Noble
-    cd smartdre || { echo "Error: No se pudo acceder a la carpeta"; exit 1; }
-    
-    echo -e "${VERDE}Ejecutando install-noble...${NORMAL}"
-    chmod +x install-noble
-    ./install-noble
-    
-    # Volver atrás
-    cd ..
+# Comprobar si el ejecutable instalado por install-oracular existe en el sistema
+esta_instalado() {
+    [ -f "/usr/bin/smartdre" ]
 }
 
-# 2. Ejecutar la función
-installSmartdre
+case "$1" in
+    enable|install)
+        # 1. Habilitar repositorios temporales de Ubuntu por si faltan dependencias (docker.io, etc.)
+        if [ -f "$TOGGLE_REPOS" ]; then
+            bash "$TOGGLE_REPOS" enable
+        fi
 
-# 3. Borrar la carpeta para que si falla o actualizamos el codigo la descargue otra vez en el próximo intento
-rm -r /opt/guadamint/smartdre
+        # 2. Clonar e instalar desde el repositorio oficial de SMART
+        TEMP_DIR="/tmp/smartdre_install"
+        rm -rf "$TEMP_DIR"
+        git clone https://github.com/aosucas499/smartdre.git "$TEMP_DIR"
 
-echo -e "${AZUL}====================================================${NORMAL}"
-echo -e "${VERDE}PROCESO FINALIZADO${NORMAL}"
-echo -e "${AZUL}====================================================${NORMAL}"
+        if [ -d "$TEMP_DIR" ]; then
+            cd "$TEMP_DIR" || exit 1
+            chmod +x install-oracular
+            ./install-oracular
+            cd /tmp || exit 1
+            rm -rf "$TEMP_DIR"
+        fi
+
+        # 3. Desactivar repositorios temporales y limpiar RAM
+        if [ -f "$TOGGLE_REPOS" ]; then
+            bash "$TOGGLE_REPOS" disable
+        fi
+        ;;
+
+    disable|remove)
+        # 1. Intentar desinstalar mediante el script oficial uninstall-smartdre
+        TEMP_DIR="/tmp/smartdre_install"
+        rm -rf "$TEMP_DIR"
+        git clone https://github.com/aosucas499/smartdre.git "$TEMP_DIR"
+
+        if [ -d "$TEMP_DIR" ]; then
+            cd "$TEMP_DIR" || exit 1
+            if [ -f "uninstall-smartdre" ]; then
+                chmod +x uninstall-smartdre
+                ./uninstall-smartdre
+            fi
+            cd /tmp || exit 1
+            rm -rf "$TEMP_DIR"
+        fi
+
+        # 2. Limpieza de seguridad de archivos y accesos directos
+        rm -f /usr/bin/smartdre /usr/bin/orient /usr/bin/controlpanel /usr/bin/check-appindicator-gnome-extension
+        rm -f /etc/xdg/autostart/smartdre.desktop /etc/xdg/autostart/check-appindicator-gnome-extension.desktop
+        rm -f /usr/share/applications/smartdre*.desktop
+        rm -f /etc/sudoers.d/zz-smartdre /etc/sudoers.d/zz-orient /etc/sudoers.d/zz-controlpanel
+        docker rmi aosucas499/smartdre:eos 2>/dev/null || true
+        ;;
+
+    status)
+        if esta_instalado; then
+            exit 0 # Instalado -> Switch ENCENDIDO
+        else
+            exit 1 # NO instalado -> Switch APAGADO
+        fi
+        ;;
+
+    *)
+        echo "Uso: $0 {enable|disable|status}"
+        exit 1
+        ;;
+esac
