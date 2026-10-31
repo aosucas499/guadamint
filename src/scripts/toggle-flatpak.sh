@@ -19,6 +19,7 @@ case "$1" in
         export DEBIAN_FRONTEND=noninteractive
         apt-get update -y
         apt-get install -y flatpak 
+        cd "$(dirname "$0")"
         dpkg -i gnome-software-plugin-flatpak_47.0-1-SAR_amd64.deb
 
         # 3. Añadir el repositorio oficial Flathub
