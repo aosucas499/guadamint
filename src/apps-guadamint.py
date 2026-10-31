@@ -84,13 +84,14 @@ CATALOGO = [
 ]
 
 def comprobar_estado(item):
-    """Comprueba si un elemento está instalado o activo sin congelar la app."""
+    """Comprueba el estado invocando 'bash' directamente para evitar Errno 13 de permisos."""
     tipo = item.get("tipo")
     try:
         if tipo == "script":
             script_path = item.get("script")
             if script_path and os.path.exists(script_path):
-                res = subprocess.run([script_path, "status"], capture_output=True, text=True, timeout=3)
+                # Invocar con bash evita el error si el archivo .sh no tiene flag +x
+                res = subprocess.run(["bash", script_path, "status"], capture_output=True, text=True, timeout=3)
                 return res.returncode == 0
             return False
         elif tipo == "apt":
@@ -111,14 +112,14 @@ class GuadaMintApp(Gtk.Window):
         header = Gtk.HeaderBar()
         header.set_show_close_button(True)
         header.set_title("GuadaMint")
-        header.set_subtitle("EducualAndOS v2")
+        header.set_subtitle("EducAndOS v2")
         self.set_titlebar(header)
 
         # Botón de refrescar
         btn_refresh = Gtk.Button()
         icon = Gtk.Image.new_from_icon_name("view-refresh-symbolic", Gtk.IconSize.BUTTON)
         btn_refresh.add(icon)
-        btn_refresh.connect("clicked", lambda x: self.cargar_catalogo())
+        btn_refresh.connect("clicked", lambda x: self.cargar_catalogo_actual())
         header.pack_end(btn_refresh)
 
         # Contenedor principal
@@ -156,6 +157,7 @@ class GuadaMintApp(Gtk.Window):
 
         main_box.pack_start(scroll, True, True, 0)
 
+        self.categoria_actual = "Aplicaciones"
         # Seleccionar primera categoría al iniciar
         self.sidebar.select_row(self.sidebar.get_row_at_index(0))
 
@@ -163,8 +165,11 @@ class GuadaMintApp(Gtk.Window):
         if row is None:
             return
         label = row.get_child()
-        categoria_seleccionada = label.get_text()
-        self.cargar_catalogo(categoria_seleccionada)
+        self.categoria_actual = label.get_text()
+        self.cargar_catalogo(self.categoria_actual)
+
+    def cargar_catalogo_actual(self):
+        self.cargar_catalogo(self.categoria_actual)
 
     def cargar_catalogo(self, categoria="Aplicaciones"):
         # Limpiar lista anterior
@@ -189,8 +194,8 @@ class GuadaMintApp(Gtk.Window):
                 img_icono.set_pixel_size(48)
             else:
                 # Icono genérico si no se encuentra la imagen específica
-                nombre_icono_defecto = "preferences-system" if item.get("tipo") == "script" else "package-x-generic"
-                img_icono = Gtk.Image.new_from_icon_name(nombre_icono_defecto, Gtk.IconSize.DND)
+                defecto = "preferences-system" if item.get("tipo") == "script" else "package-x-generic"
+                img_icono = Gtk.Image.new_from_icon_name(defecto, Gtk.IconSize.DND)
                 img_icono.set_pixel_size(48)
 
             card.pack_start(img_icono, False, False, 0)
@@ -229,7 +234,7 @@ class GuadaMintApp(Gtk.Window):
         self.listbox_items.show_all()
 
     def set_switch_state_silent(self, switch, estado):
-        """Aplica el estado al Switch sin activar la señal state-set."""
+        """Aplica el estado al Switch sin disparar el evento state-set."""
         switch.handler_block_by_func(self.on_switch_toggled)
         switch.set_active(estado)
         switch.handler_unblock_by_func(self.on_switch_toggled)
@@ -240,7 +245,8 @@ class GuadaMintApp(Gtk.Window):
         def ejecutar_accion():
             try:
                 if item["tipo"] == "script":
-                    cmd = ["sudo", item["script"], accion]
+                    # Usamos 'sudo bash' explícitamente para evitar problemas de permisos
+                    cmd = ["sudo", "bash", item["script"], accion]
                 elif item["tipo"] == "apt":
                     op = "install" if state else "purge"
                     cmd = ["sudo", "apt-get", op, "-y", item["paquete"]]
@@ -249,7 +255,6 @@ class GuadaMintApp(Gtk.Window):
             except Exception as e:
                 print(f"Error al ejecutar {accion} en {item['nombre']}: {e}")
             finally:
-                # Re-comprobar estado real tras terminar la instalación
                 estado_final = comprobar_estado(item)
                 GLib.idle_add(lambda: self.set_switch_state_silent(switch, estado_final))
 
