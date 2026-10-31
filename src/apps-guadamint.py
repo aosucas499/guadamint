@@ -379,6 +379,13 @@ class GuadaStoreWindow(Gtk.Window):
             threading.Thread(target=row.check_installed).start()
 
 def main():
+    # Asignar el nombre del programa para que el Dock de Ubuntu lo identifique
+    GLib.set_prgname("apps-guadamint.py")
+    GLib.set_application_name(TITULO_APP)
+    
+    if os.path.exists(ICONO_APP):
+        Gtk.Window.set_default_icon_from_file(ICONO_APP)
+
     if not es_administrador():
         dialog = Gtk.MessageDialog(parent=None, flags=Gtk.DialogFlags.MODAL, message_type=Gtk.MessageType.ERROR, buttons=Gtk.ButtonsType.OK, text="Acceso Restringido")
         dialog.format_secondary_text("Esta aplicación es solo para administradores.\n\nContacte con su administrador/a TDE para instalar aplicaciones.")
