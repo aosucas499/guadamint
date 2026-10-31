@@ -10,9 +10,9 @@ fi
 case "$1" in
     enable)
         echo "# Repositorios temporales de Ubuntu en RAM (/tmp)" > "$TEMP_REPO_FILE"
-        echo "deb http://archive.ubuntu.com/ubuntu/ jammy main restricted universe multiverse" >> "$TEMP_REPO_FILE"
-        echo "deb http://archive.ubuntu.com/ubuntu/ jammy-updates main restricted universe multiverse" >> "$TEMP_REPO_FILE"
-        echo "deb http://archive.ubuntu.com/ubuntu/ jammy-security main restricted universe multiverse" >> "$TEMP_REPO_FILE"
+        echo "deb http://archive.ubuntu.com/ubuntu/ oracular main restricted universe multiverse" >> "$TEMP_REPO_FILE"
+        echo "deb http://archive.ubuntu.com/ubuntu/ oracular-updates main restricted universe multiverse" >> "$TEMP_REPO_FILE"
+        echo "deb http://archive.ubuntu.com/ubuntu/ oracular-security main restricted universe multiverse" >> "$TEMP_REPO_FILE"
         apt-get update -qq
         ;;
     disable)
