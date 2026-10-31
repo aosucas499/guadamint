@@ -1,408 +1,263 @@
 #!/usr/bin/env python3
-import gi
-gi.require_version('Gtk', '3.0')
-from gi.repository import Gtk, Gdk, GLib, GdkPixbuf
-import subprocess
 import os
 import sys
+import subprocess
 import threading
-import shutil
-import grp
-import time
-import datetime
+import gi
 
-# ==============================================================================
-# CONFIGURACIÓN
-# ==============================================================================
-ICONO_APP = "/usr/share/icons/guadamintuz.svg"
-TITULO_APP = "Centro de Software GuadaMint"
+gi.require_version('Gtk', '3.0')
+from gi.repository import Gtk, Gdk, GLib, Pango
 
-# Configuración de Logs
-if os.geteuid() == 0:
-    LOG_FILE = "/var/log/guadamint/tienda.log"
-else:
-    LOG_FILE = f"/tmp/guadamint-tienda-{os.getuid()}.log"
+# Identificador de proceso para la barra de tareas / escritorio
+GLib.set_prgname("apps-guadamint")
 
-# Asegurar directorio de logs si somos root
-if os.geteuid() == 0 and not os.path.exists(os.path.dirname(LOG_FILE)):
-    try: os.makedirs(os.path.dirname(LOG_FILE))
-    except: pass
-
-# --- CATÁLOGO DE APLICACIONES ---
+# ==========================================
+# CATÁLOGO DE APLICACIONES Y SCRIPTS
+# ==========================================
 CATALOGO = [
+    # --- APLICACIONES ---
     {
+        "id": "gimp",
+        "nombre": "GIMP",
+        "descripcion": "Editor de imágenes y retoque fotográfico avanzado.",
         "categoria": "Aplicaciones",
-        "apps": [
-            {"id": "vlc", "nombre": "VLC Media Player", "desc": "Reproductor multimedia de ejemplo", "icono": "vlc"},
-            {"id": "openboard", "nombre": "Openboard", "desc": "Aplicación de pizarra interactiva", "icono": "openboard"},
-        ]
+        "tipo": "apt",
+        "paquete": "gimp",
+        "icono": "/usr/share/icons/hicolor/48x48/apps/gimp.png"
     },
     {
+        "id": "vlc",
+        "nombre": "VLC Media Player",
+        "descripcion": "Reproductor multimedia multiformato.",
+        "categoria": "Aplicaciones",
+        "tipo": "apt",
+        "paquete": "vlc",
+        "icono": "/usr/share/icons/hicolor/48x48/apps/vlc.png"
+    },
+    {
+        "id": "libreoffice",
+        "nombre": "LibreOffice",
+        "descripcion": "Suite ofimática para procesado de textos, hojas de cálculo y presentaciones.",
+        "categoria": "Aplicaciones",
+        "tipo": "apt",
+        "paquete": "libreoffice",
+        "icono": "/usr/share/icons/hicolor/48x48/apps/libreoffice-main.png"
+    },
+    {
+        "id": "inkscape",
+        "nombre": "Inkscape",
+        "descripcion": "Editor de gráficos vectoriales SVG.",
+        "categoria": "Aplicaciones",
+        "tipo": "apt",
+        "paquete": "inkscape",
+        "icono": "/usr/share/icons/hicolor/48x48/apps/inkscape.png"
+    },
+
+    # --- SCRIPTS Y CONFIGURACIONES ---
+    {
+        "id": "smartboard",
+        "nombre": "Drivers SMART Board",
+        "descripcion": "Controladores para pizarras digitales SMART Board (smartdre / Docker).",
         "categoria": "Scripts y Configuraciones",
-        "apps": [
-            {
-                "id": "ubuntu-repos", 
-                "nombre": "Repositorios Temporales de Ubuntu", 
-                "desc": "Permite dependencias oficiales extra en RAM (/tmp). Se borran al reiniciar.", 
-                "icono": "ubuntu-logo", 
-                "script_install": "toggle-ubuntu-repos.sh"
-            },
-            {
-                "id": "smart-product-drivers", 
-                "nombre": "Drivers SMART Board", 
-                "desc": "Controladores para pizarras interactivas", 
-                "icono": "video-display", 
-                "script_install": "instalar_smartboard.sh"
-            },
-            {
-                "id": "flatpak", 
-                "nombre": "Soporte Flatpak y Flathub", 
-                "desc": "Instala el motor Flatpak y lo integra automáticamente en el Centro de Software", 
-                "icono": "system-software-install", 
-                "script_install": "toggle-flatpak.sh"
-            },
-        ]
+        "tipo": "script",
+        "script": "/opt/guadamint/src/scripts/instalar_smartboard.sh",
+        "icono": "/opt/guadamint/src/icons/smartboard.png"
+    },
+    {
+        "id": "flatpak_repo",
+        "nombre": "Soporte Flatpak y Flathub",
+        "descripcion": "Habilita la integración de paquetes Flatpak y el repositorio Flathub.",
+        "categoria": "Scripts y Configuraciones",
+        "tipo": "script",
+        "script": "/opt/guadamint/src/scripts/toggle-flatpak.sh",
+        "icono": "/opt/guadamint/src/icons/flatpak.png"
+    },
+    {
+        "id": "ubuntu_repos",
+        "nombre": "Repositorios Temporales Ubuntu",
+        "descripcion": "Activa temporalmente en RAM los repositorios oficiales de Ubuntu para actualizar paquetes.",
+        "categoria": "Scripts y Configuraciones",
+        "tipo": "script",
+        "script": "/opt/guadamint/src/scripts/toggle-ubuntu-repos.sh",
+        "icono": "/opt/guadamint/src/icons/ubuntu.png"
     }
 ]
 
-# --- AUTO-UPDATE CONFIG Y RUTAS ---
-REPO_DIR = "/opt/guadamint"
-REPO_URL = "https://github.com/aosucas499/guadamint.git"
-REPO_BRANCH = "eos"
-SCRIPT_SRC = os.path.join(REPO_DIR, "src/apps-guadamint.py")
-SCRIPT_BIN = "/usr/bin/apps-guadamint.py"
-RUTA_SCRIPTS_REPO = "/opt/guadamint/src/scripts"
-
-# ==============================================================================
-# SISTEMA DE LOGS
-# ==============================================================================
-def log(msg):
+def comprobar_estado(item):
+    """Comprueba si un elemento está instalado o activo sin congelar la app."""
+    tipo = item.get("tipo")
     try:
-        print(msg)
-        timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        with open(LOG_FILE, "a") as f:
-            f.write(f"[{timestamp}] {msg}\n")
-    except: pass
-
-# ==============================================================================
-# SEGURIDAD Y PERMISOS
-# ==============================================================================
-def es_administrador():
-    try:
-        if os.geteuid() == 0: return True
-        gid_list = os.getgroups()
-        for gid in gid_list:
-            nombre = grp.getgrgid(gid).gr_name
-            if nombre == 'sudo' or nombre == 'admin' or nombre == 'tde': return True
-        return False
-    except: return False
-
-def elevar_a_root():
-    if os.geteuid() != 0:
-        log("Elevando privilegios con pkexec...")
-        usuario_real = os.environ.get('USER', 'usuario')
-        env = os.environ.copy()
-        if 'XAUTHORITY' not in env:
-            possible_auth = f"/home/{usuario_real}/.Xauthority"
-            if os.path.exists(possible_auth):
-                env['XAUTHORITY'] = possible_auth
-        
-        args = ['pkexec', 'env', f'DISPLAY={env.get("DISPLAY", ":0")}', 
-                f'XAUTHORITY={env.get("XAUTHORITY", "")}', 
-                sys.executable] + sys.argv
-        try:
-            os.execvpe('pkexec', args, env)
-        except Exception as e:
-            log(f"Error elevación: {e}")
-            sys.exit(1)
-
-def hay_bloqueo_apt():
-    locks = ["/var/lib/dpkg/lock-frontend", "/var/lib/dpkg/lock"]
-    for lock in locks:
-        if subprocess.run(["fuser", lock], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode == 0:
-            return True
+        if tipo == "script":
+            script_path = item.get("script")
+            if script_path and os.path.exists(script_path):
+                res = subprocess.run([script_path, "status"], capture_output=True, text=True, timeout=3)
+                return res.returncode == 0
+            return False
+        elif tipo == "apt":
+            pkg = item.get("paquete")
+            res = subprocess.run(["dpkg-query", "-W", "-f=${Status}", pkg], capture_output=True, text=True)
+            return "installed" in res.stdout
+    except Exception as e:
+        print(f"Error comprobando {item.get('nombre')}: {e}")
     return False
 
-# ==============================================================================
-# AUTO-UPDATE
-# ==============================================================================
-def auto_update():
-    if not os.access(SCRIPT_BIN, os.W_OK): return
-    try:
-        git_dir = os.path.join(REPO_DIR, ".git")
-        if not os.path.exists(REPO_DIR) or not os.path.exists(git_dir):
-            if os.path.exists(REPO_DIR): shutil.rmtree(REPO_DIR)
-            subprocess.run(["git", "clone", "-b", REPO_BRANCH, REPO_URL, REPO_DIR], check=True)
-        else:
-            subprocess.run(["git", "-C", REPO_DIR, "fetch", "origin"], check=True, stderr=subprocess.DEVNULL)
-            subprocess.run(["git", "-C", REPO_DIR, "reset", "--hard", f"origin/{REPO_BRANCH}"], check=True, stderr=subprocess.DEVNULL)
-        
-        if os.path.exists(SCRIPT_SRC) and os.path.realpath(__file__) != os.path.realpath(SCRIPT_SRC):
-            with open(SCRIPT_SRC, 'rb') as f1, open(SCRIPT_BIN, 'rb') as f2:
-                if f1.read() != f2.read():
-                    log("Actualizando script de la tienda...")
-                    shutil.copy2(SCRIPT_SRC, SCRIPT_BIN)
-                    os.chmod(SCRIPT_BIN, 0o755)
-                    os.execv(sys.executable, [sys.executable] + sys.argv)
-    except Exception as e:
-        log(f"Error en auto_update: {e}")
-
-# ==============================================================================
-# INTERFAZ GRÁFICA
-# ==============================================================================
-class FilaApp(Gtk.ListBoxRow):
-    def __init__(self, app_data, ventana_padre):
-        super().__init__()
-        self.app_data = app_data
-        self.ventana_padre = ventana_padre
-        self.pkg_name = app_data["id"]
-
-        box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
-        box.set_border_width(10)
-        
-        icon = Gtk.Image()
-        icon.set_pixel_size(48)
-        icono_nombre = app_data["icono"]
-        if os.path.isabs(icono_nombre) and os.path.exists(icono_nombre):
-             icon.set_from_file(icono_nombre)
-        elif Gtk.IconTheme.get_default().has_icon(icono_nombre):
-            icon.set_from_icon_name(icono_nombre, Gtk.IconSize.DIALOG)
-        else:
-            icon.set_from_icon_name("system-software-install", Gtk.IconSize.DIALOG)
-        box.pack_start(icon, False, False, 0)
-
-        vbox_text = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
-        lbl_name = Gtk.Label(xalign=0)
-        lbl_name.set_markup(f"<b>{app_data['nombre']}</b>")
-        lbl_desc = Gtk.Label(label=app_data['desc'], xalign=0)
-        lbl_desc.get_style_context().add_class("dim-label")
-        lbl_desc.set_max_width_chars(40)
-        lbl_desc.set_line_wrap(True)
-        vbox_text.pack_start(lbl_name, True, True, 0)
-        vbox_text.pack_start(lbl_desc, True, True, 0)
-        box.pack_start(vbox_text, True, True, 0)
-
-        self.switch = Gtk.Switch()
-        self.switch.set_valign(Gtk.Align.CENTER)
-        self.handler_id = self.switch.connect("state-set", self.on_switch_activated)
-        
-        self.spinner = Gtk.Spinner()
-        
-        box.pack_end(self.switch, False, False, 0)
-        box.pack_end(self.spinner, False, False, 10)
-        
-        self.add(box)
-        threading.Thread(target=self.check_installed).start()
-
-    def check_installed(self):
-        is_installed = False
-        try:
-            if "script_install" in self.app_data:
-                ruta_script = os.path.join(RUTA_SCRIPTS_REPO, self.app_data["script_install"])
-                if os.path.exists(ruta_script):
-                    res = subprocess.run(["/bin/bash", ruta_script, "status"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-                    is_installed = (res.returncode == 0)
-            else:
-                res = subprocess.run(
-                    ["dpkg-query", "-W", "--showformat=${Status}", self.pkg_name], 
-                    stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True
-                )
-                is_installed = "install ok installed" in res.stdout
-        except:
-            is_installed = False
-            
-        GLib.idle_add(self.update_switch_state, is_installed)
-
-    def update_switch_state(self, state):
-        self.switch.handler_block(self.handler_id)
-        self.switch.set_active(state)
-        self.switch.handler_unblock(self.handler_id)
-        return False
-
-    def on_switch_activated(self, switch, state):
-        self.switch.set_sensitive(False)
-        self.spinner.start()
-        
-        if hay_bloqueo_apt():
-            self.mostrar_error("Sistema ocupado (APT bloqueado).\nInténtalo en un minuto.")
-            self.spinner.stop()
-            self.switch.set_sensitive(True)
-            self.switch.handler_block(self.handler_id)
-            self.switch.set_active(not state)
-            self.switch.handler_unblock(self.handler_id)
-            return True 
-
-        self.switch.set_state(state)
-
-        action = "install" if state else "remove"
-        threading.Thread(target=self.run_apt_action, args=(action,)).start()
-        return True
-
-    def mostrar_error(self, mensaje):
-        dialog = Gtk.MessageDialog(parent=self.ventana_padre, flags=Gtk.DialogFlags.MODAL, message_type=Gtk.MessageType.ERROR, buttons=Gtk.ButtonsType.OK, text="Aviso")
-        dialog.format_secondary_text(mensaje)
-        dialog.run()
-        dialog.destroy()
-
-    def run_apt_action(self, action):
-        log(f"Iniciando acción: {action} {self.pkg_name}")
-        error_msg = ""
-        success = False
-        cmd = []
-        
-        if "script_install" in self.app_data:
-            nombre_script = self.app_data["script_install"]
-            ruta_script = os.path.join(RUTA_SCRIPTS_REPO, nombre_script)
-            if os.path.exists(ruta_script):
-                os.chmod(ruta_script, 0o755)
-                param = "enable" if action == "install" else "disable"
-                cmd = ["/bin/bash", ruta_script, param]
-            else:
-                error_msg = f"Script no encontrado: {ruta_script}"
-        else:
-            cmd = ["env", "DEBIAN_FRONTEND=noninteractive", "/usr/bin/apt-get", action, "-y", "-o", "Dpkg::Options::=--force-confdef", "-o", "Dpkg::Options::=--force-confold", self.pkg_name]
-
-        if cmd:
-            try:
-                process = subprocess.Popen(
-                    cmd, 
-                    stdout=subprocess.PIPE, 
-                    stderr=subprocess.STDOUT, 
-                    text=True
-                )
-                
-                full_log = ""
-                for line in process.stdout:
-                    log(f"[EXEC] {line.strip()}")
-                    full_log += line
-                
-                process.wait()
-                
-                if process.returncode == 0:
-                    success = True
-                    log("Comando completado con éxito.")
-                else:
-                    log(f"Error (Código {process.returncode})")
-                    if "Unable to locate" in full_log: error_msg = f"Paquete no encontrado."
-                    elif "lock" in full_log: error_msg = "Bloqueo APT."
-                    else: error_msg = "Error en la ejecución. Ver logs."
-            except Exception as e:
-                log(f"Excepción Python: {e}")
-                error_msg = str(e)
-
-        GLib.idle_add(self.finish_action, success, (action == "install"), error_msg)
-
-    def finish_action(self, success, intended_state, error_msg=""):
-        self.spinner.stop()
-        self.switch.set_sensitive(True)
-        
-        if success:
-            user = os.environ.get('SUDO_USER', os.environ.get('USER'))
-            if not user or user == 'root':
-                try:
-                    user = subprocess.check_output(
-                        ["loginctl", "list-sessions"], text=True
-                    ).split("\n")[1].split()[2]
-                except:
-                    user = "administrador"
-
-            cmd = [
-                'systemd-run',
-                f'--machine={user}@.host',
-                '--user',
-                'notify-send',
-                '-a', 'GuadaMint Store',
-                '-i', 'system-software-update',
-                'GuadaMint Store',
-                f'Operación completada: {self.app_data["nombre"]}'
-            ]
-            subprocess.Popen(cmd, stderr=subprocess.DEVNULL)
-        else:
-            self.switch.handler_block(self.handler_id)
-            self.switch.set_active(not intended_state)
-            self.switch.handler_unblock(self.handler_id)
-            
-            if error_msg: self.mostrar_error(error_msg)
-            else: self.mostrar_error("Operación fallida. Revise los logs.")
-        
-        return False
-        
-class GuadaStoreWindow(Gtk.Window):
+class GuadaMintApp(Gtk.Window):
     def __init__(self):
-        super().__init__(title=TITULO_APP)
-        self.set_default_size(600, 700)
-        self.set_border_width(0)
-        if os.path.exists(ICONO_APP): self.set_icon_from_file(ICONO_APP)
+        super().__init__(title="GuadaMint - Tienda de Software")
+        self.set_default_size(850, 550)
+        self.set_position(Gtk.WindowPosition.CENTER)
 
+        # HeaderBar principal
         header = Gtk.HeaderBar()
         header.set_show_close_button(True)
-        header.set_title(TITULO_APP)
-        header.set_subtitle("Instalador de Software Escolar (Modo Admin)")
+        header.set_title("GuadaMint")
+        header.set_subtitle("EducualAndOS v2")
         self.set_titlebar(header)
-        
+
+        # Botón de refrescar
         btn_refresh = Gtk.Button()
-        icon_refresh = Gtk.Image.new_from_icon_name("view-refresh-symbolic", Gtk.IconSize.BUTTON)
-        btn_refresh.add(icon_refresh)
-        btn_refresh.connect("clicked", self.refresh_all)
-        header.pack_start(btn_refresh)
+        icon = Gtk.Image.new_from_icon_name("view-refresh-symbolic", Gtk.IconSize.BUTTON)
+        btn_refresh.add(icon)
+        btn_refresh.connect("clicked", lambda x: self.cargar_catalogo())
+        header.pack_end(btn_refresh)
 
-        scrolled = Gtk.ScrolledWindow()
-        scrolled.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
-        self.add(scrolled)
+        # Contenedor principal
+        main_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=0)
+        self.add(main_box)
 
-        self.main_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
-        self.main_box.set_border_width(15)
-        scrolled.add(self.main_box)
+        # Barra lateral de categorías
+        self.sidebar = Gtk.ListBox()
+        self.sidebar.set_size_request(200, -1)
+        self.sidebar.connect("row-selected", self.on_categoria_changed)
 
-        # --- CATÁLOGO DE APLICACIONES ---
-        self.rows = []
-        for seccion in CATALOGO:
-            lbl_sec = Gtk.Label(label=seccion["categoria"], xalign=0)
-            lbl_sec.get_style_context().add_class("h3")
-            lbl_sec.set_margin_top(15)
-            lbl_sec.set_margin_bottom(5)
-            self.main_box.pack_start(lbl_sec, False, False, 0)
+        cat_apps = Gtk.Label(label="Aplicaciones", xalign=0)
+        cat_apps.set_margin_start(12)
+        cat_apps.set_margin_top(12)
+        cat_apps.set_margin_bottom(12)
+        
+        cat_scripts = Gtk.Label(label="Scripts y Configuraciones", xalign=0)
+        cat_scripts.set_margin_start(12)
+        cat_scripts.set_margin_top(12)
+        cat_scripts.set_margin_bottom(12)
+
+        self.sidebar.add(cat_apps)
+        self.sidebar.add(cat_scripts)
+
+        main_box.pack_start(self.sidebar, False, False, 0)
+        main_box.pack_start(Gtk.Separator(orientation=Gtk.Orientation.VERTICAL), False, False, 0)
+
+        # Área de catálogo con Scroll
+        scroll = Gtk.ScrolledWindow()
+        scroll.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
+        
+        self.listbox_items = Gtk.ListBox()
+        self.listbox_items.set_selection_mode(Gtk.SelectionMode.NONE)
+        scroll.add(self.listbox_items)
+
+        main_box.pack_start(scroll, True, True, 0)
+
+        # Seleccionar primera categoría al iniciar
+        self.sidebar.select_row(self.sidebar.get_row_at_index(0))
+
+    def on_categoria_changed(self, listbox, row):
+        if row is None:
+            return
+        label = row.get_child()
+        categoria_seleccionada = label.get_text()
+        self.cargar_catalogo(categoria_seleccionada)
+
+    def cargar_catalogo(self, categoria="Aplicaciones"):
+        # Limpiar lista anterior
+        for child in self.listbox_items.get_children():
+            self.listbox_items.remove(child)
+
+        # Filtrar elementos por categoría
+        elementos = [item for item in CATALOGO if item.get("categoria") == categoria]
+
+        for item in elementos:
+            row = Gtk.ListBoxRow()
+            card = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=15)
+            card.set_margin_start(12)
+            card.set_margin_end(12)
+            card.set_margin_top(10)
+            card.set_margin_bottom(10)
+
+            # --- GESTIÓN SEGURA DE ICONOS ---
+            ruta_icono = item.get("icono", "")
+            if os.path.exists(ruta_icono):
+                img_icono = Gtk.Image.new_from_file(ruta_icono)
+                img_icono.set_pixel_size(48)
+            else:
+                # Icono genérico si no se encuentra la imagen específica
+                nombre_icono_defecto = "preferences-system" if item.get("tipo") == "script" else "package-x-generic"
+                img_icono = Gtk.Image.new_from_icon_name(nombre_icono_defecto, Gtk.IconSize.DND)
+                img_icono.set_pixel_size(48)
+
+            card.pack_start(img_icono, False, False, 0)
+
+            # Texto: Nombre y Descripción
+            vbox_text = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
+            lbl_nombre = Gtk.Label(xalign=0)
+            lbl_nombre.set_markup(f"<b>{item['nombre']}</b>")
             
-            listbox = Gtk.ListBox()
-            listbox.set_selection_mode(Gtk.SelectionMode.NONE)
-            listbox.get_style_context().add_class("frame") 
+            lbl_desc = Gtk.Label(label=item['descripcion'], xalign=0)
+            lbl_desc.set_line_wrap(True)
+            lbl_desc.set_max_width_chars(50)
+
+            vbox_text.pack_start(lbl_nombre, False, False, 0)
+            vbox_text.pack_start(lbl_desc, False, False, 0)
+            card.pack_start(vbox_text, True, True, 0)
+
+            # Conmutador / Switch de Estado
+            switch = Gtk.Switch()
+            switch.set_valign(Gtk.Align.CENTER)
             
-            for app in seccion["apps"]:
-                row = FilaApp(app, self)
-                listbox.add(row)
-                self.rows.append(row)
-            
-            self.main_box.pack_start(listbox, False, False, 0)
+            # Comprobación de estado inicial en segundo plano
+            def verificar_y_actualizar_switch(sw, itm):
+                estado = comprobar_estado(itm)
+                GLib.idle_add(lambda: self.set_switch_state_silent(sw, estado))
 
-    def refresh_all(self, widget):
-        for row in self.rows:
-            threading.Thread(target=row.check_installed).start()
+            threading.Thread(target=verificar_y_actualizar_switch, args=(switch, item), daemon=True).start()
 
-def main():
-    # Asignar el nombre del programa para que el Dock de Ubuntu lo identifique
-    GLib.set_prgname("apps-guadamint.py")
-    GLib.set_application_name(TITULO_APP)
-    
-    if os.path.exists(ICONO_APP):
-        Gtk.Window.set_default_icon_from_file(ICONO_APP)
+            # Conectar acción de activación/desactivación
+            switch.connect("state-set", self.on_switch_toggled, item)
+            card.pack_end(switch, False, False, 0)
 
-    if not es_administrador():
-        dialog = Gtk.MessageDialog(parent=None, flags=Gtk.DialogFlags.MODAL, message_type=Gtk.MessageType.ERROR, buttons=Gtk.ButtonsType.OK, text="Acceso Restringido")
-        dialog.format_secondary_text("Esta aplicación es solo para administradores.\n\nContacte con su administrador/a TDE para instalar aplicaciones.")
-        dialog.set_title("GuadaMint Store")
-        if os.path.exists(ICONO_APP): dialog.set_icon_from_file(ICONO_APP)
-        dialog.run()
-        dialog.destroy()
-        sys.exit(0)
+            row.add(card)
+            self.listbox_items.add(row)
 
-    elevar_a_root()
-    try: auto_update()
-    except: pass
-    
-    win = GuadaStoreWindow()
-    win.connect("destroy", Gtk.main_quit)
-    win.show_all()
-    Gtk.main()
+        self.listbox_items.show_all()
+
+    def set_switch_state_silent(self, switch, estado):
+        """Aplica el estado al Switch sin activar la señal state-set."""
+        switch.handler_block_by_func(self.on_switch_toggled)
+        switch.set_active(estado)
+        switch.handler_unblock_by_func(self.on_switch_toggled)
+
+    def on_switch_toggled(self, switch, state, item):
+        accion = "enable" if state else "disable"
+        
+        def ejecutar_accion():
+            try:
+                if item["tipo"] == "script":
+                    cmd = ["sudo", item["script"], accion]
+                elif item["tipo"] == "apt":
+                    op = "install" if state else "purge"
+                    cmd = ["sudo", "apt-get", op, "-y", item["paquete"]]
+                
+                subprocess.run(cmd, check=True)
+            except Exception as e:
+                print(f"Error al ejecutar {accion} en {item['nombre']}: {e}")
+            finally:
+                # Re-comprobar estado real tras terminar la instalación
+                estado_final = comprobar_estado(item)
+                GLib.idle_add(lambda: self.set_switch_state_silent(switch, estado_final))
+
+        threading.Thread(target=ejecutar_accion, daemon=True).start()
+        return True
 
 if __name__ == "__main__":
-    main()
+    app = GuadaMintApp()
+    app.connect("destroy", Gtk.main_quit)
+    app.show_all()
+    Gtk.main()
