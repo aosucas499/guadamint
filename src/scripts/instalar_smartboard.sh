@@ -2,7 +2,7 @@
 
 TOGGLE_REPOS="/opt/guadamint/src/scripts/toggle-ubuntu-repos.sh"
 
-# Comprobar si el ejecutable instalado por install-oracular existe en el sistema
+# Comprobar si el ejecutable instalado por install-eos2 existe en el sistema
 esta_instalado() {
     [ -f "/usr/bin/smartdre" ]
 }
@@ -22,7 +22,7 @@ case "$1" in
         if [ -d "$TEMP_DIR" ]; then
             cd "$TEMP_DIR" || exit 1
             chmod +x install-eos2
-            ./install-oracular
+            ./install-eos2
             cd /tmp || exit 1
             rm -rf "$TEMP_DIR"
         fi
