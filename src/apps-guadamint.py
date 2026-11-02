@@ -28,6 +28,15 @@ if os.geteuid() == 0 and not os.path.exists(os.path.dirname(LOG_FILE)):
     try: os.makedirs(os.path.dirname(LOG_FILE))
     except: pass
 
+# --- AUTO-UPDATE CONFIG Y RUTAS ---
+REPO_DIR = "/opt/guadamint"
+REPO_URL = "https://github.com/aosucas499/guadamint.git"
+REPO_BRANCH = "eos"
+SCRIPT_SRC = os.path.join(REPO_DIR, "src/apps-guadamint.py")
+SCRIPT_BIN = "/usr/bin/apps-guadamint.py"
+RUTA_SCRIPTS_REPO = "/opt/guadamint/src/scripts"
+RUTA_IMAGES_REPO = os.path.join(REPO_DIR, "src/images")
+
 CATALOGO = [
     {
         "categoria": "Aplicaciones",
@@ -67,15 +76,6 @@ CATALOGO = [
         ]
     }
 ]
-
-# --- AUTO-UPDATE CONFIG Y RUTAS ---
-REPO_DIR = "/opt/guadamint"
-REPO_URL = "https://github.com/aosucas499/guadamint.git"
-REPO_BRANCH = "eos"
-SCRIPT_SRC = os.path.join(REPO_DIR, "src/apps-guadamint.py")
-SCRIPT_BIN = "/usr/bin/apps-guadamint.py"
-RUTA_SCRIPTS_REPO = "/opt/guadamint/src/scripts"
-RUTA_IMAGES_REPO = os.path.join(REPO_DIR, "src/images")
 
 # ==============================================================================
 # SISTEMA DE LOGS
