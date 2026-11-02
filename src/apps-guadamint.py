@@ -28,13 +28,16 @@ if os.geteuid() == 0 and not os.path.exists(os.path.dirname(LOG_FILE)):
     try: os.makedirs(os.path.dirname(LOG_FILE))
     except: pass
 
-# --- CATÁLOGO DE APLICACIONES ---
 CATALOGO = [
     {
         "categoria": "Aplicaciones",
         "apps": [
-            {"id": "vlc", "nombre": "VLC Media Player", "desc": "Reproductor multimedia de ejemplo", "icono": "vlc"},
-            {"id": "openboard", "nombre": "Openboard", "desc": "Aplicación de pizarra interactiva", "icono": "openboard"},
+            {
+                "id": "openboard", 
+                "nombre": "Openboard", 
+                "desc": "Aplicación de pizarra interactiva", 
+                "icono": "input-tablet"             # Icono estándar GTK
+            },
         ]
     },
     {
@@ -44,7 +47,7 @@ CATALOGO = [
                 "id": "ubuntu-repos", 
                 "nombre": "Repositorios Temporales de Ubuntu", 
                 "desc": "Permite dependencias oficiales extra en RAM (/tmp). Se borran al reiniciar.", 
-                "icono": "ubuntu-logo", 
+                "icono": "software-update-available", # Icono estándar GTK
                 "script_install": "toggle-ubuntu-repos.sh"
             },
             {
