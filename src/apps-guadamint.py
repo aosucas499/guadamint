@@ -36,7 +36,7 @@ CATALOGO = [
                 "id": "openboard", 
                 "nombre": "Openboard", 
                 "desc": "Aplicación de pizarra interactiva", 
-                "icono": "input-tablet"             # Icono estándar GTK
+                "icono": "openboard"
             },
         ]
     },
@@ -47,21 +47,21 @@ CATALOGO = [
                 "id": "ubuntu-repos", 
                 "nombre": "Repositorios Temporales de Ubuntu", 
                 "desc": "Permite dependencias oficiales extra en RAM (/tmp). Se borran al reiniciar.", 
-                "icono": "software-update-available", # Icono estándar GTK
+                "icono": os.path.join(RUTA_IMAGES_REPO, "ubuntu.svg"), 
                 "script_install": "toggle-ubuntu-repos.sh"
             },
             {
                 "id": "smart-product-drivers", 
                 "nombre": "Drivers SMART Board", 
                 "desc": "Controladores para pizarras interactivas", 
-                "icono": "video-display", 
+                "icono": os.path.join(RUTA_IMAGES_REPO, "smart.png"), 
                 "script_install": "instalar_smartboard.sh"
             },
             {
                 "id": "flatpak", 
                 "nombre": "Soporte Flatpak y Flathub", 
                 "desc": "Instala el motor Flatpak y lo integra automáticamente en el Centro de Software", 
-                "icono": "system-software-install", 
+                "icono": os.path.join(RUTA_IMAGES_REPO, "flatpak.svg"), 
                 "script_install": "toggle-flatpak.sh"
             },
         ]
@@ -75,6 +75,7 @@ REPO_BRANCH = "eos"
 SCRIPT_SRC = os.path.join(REPO_DIR, "src/apps-guadamint.py")
 SCRIPT_BIN = "/usr/bin/apps-guadamint.py"
 RUTA_SCRIPTS_REPO = "/opt/guadamint/src/scripts"
+RUTA_IMAGES_REPO = os.path.join(REPO_DIR, "src/images")
 
 # ==============================================================================
 # SISTEMA DE LOGS
