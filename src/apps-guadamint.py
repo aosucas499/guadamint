@@ -35,7 +35,7 @@ REPO_BRANCH = "eos"
 SCRIPT_SRC = os.path.join(REPO_DIR, "src/apps-guadamint.py")
 SCRIPT_BIN = "/usr/bin/apps-guadamint.py"
 RUTA_SCRIPTS_REPO = "/opt/guadamint/src/scripts"
-RUTA_IMAGES_REPO = os.path.join(REPO_DIR, "src/images")
+RUTA_IMAGES_REPO = os.path.join(REPO_DIR, "images")
 
 CATALOGO = [
     {
