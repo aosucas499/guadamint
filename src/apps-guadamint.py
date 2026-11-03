@@ -130,12 +130,13 @@ def hay_bloqueo_apt():
     return False
 
 def comprobar_conexion():
-    """Comprueba si hay internet y muestra una alerta con Zenity si falla."""
+    """Comprueba si hay internet conectándose a un DNS público (Google) con socket."""
     try:
-        urllib.request.urlopen('https://www.google.com', timeout=3)
+        # Intenta conectar al puerto 53 de Google (DNS) con un timeout de 3 segundos
+        socket.create_connection(("8.8.8.8", 53), timeout=3)
         return True
-    except urllib.request.URLError:
-        # Ventana de error con Zenity si no hay red
+    except OSError:
+        # Si falla, muestra la alerta con Zenity
         subprocess.run([
             "zenity", "--error", 
             "--title=Sin conexión", 
