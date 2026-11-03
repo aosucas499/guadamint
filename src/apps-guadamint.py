@@ -130,18 +130,28 @@ def hay_bloqueo_apt():
     return False
 
 def comprobar_conexion():
-    """Comprueba si hay internet conectándose a un DNS público (Google) con socket."""
+    """Comprueba si hay internet con socket y muestra una alerta GTK si falla."""
     try:
-        # Intenta conectar al puerto 53 de Google (DNS) con un timeout de 3 segundos
+        # Comprobamos conexión con un DNS público (Google)
         socket.create_connection(("8.8.8.8", 53), timeout=3)
         return True
     except OSError:
-        # Si falla, muestra la alerta con Zenity
-        subprocess.run([
-            "zenity", "--error", 
-            "--title=Sin conexión", 
-            "--text=No se ha podido detectar conexión a Internet. Algunas funciones pueden fallar."
-        ])
+        # Si no hay red, mostramos un diálogo GTK nativo (sin problemas de display/sesión)
+        dialog = Gtk.MessageDialog(
+            parent=None,
+            flags=Gtk.DialogFlags.MODAL,
+            message_type=Gtk.MessageType.ERROR,
+            buttons=Gtk.ButtonsType.OK,
+            text="Sin conexión a Internet"
+        )
+        dialog.format_secondary_text("No se ha podido detectar conexión a Internet. Algunas funciones del repositorio pueden fallar.")
+        
+        # Ponerle el icono de tu app si existe
+        if os.path.exists(ICONO_APP):
+            dialog.set_icon_from_file(ICONO_APP)
+            
+        dialog.run()
+        dialog.destroy()
         return False
 
 # ==============================================================================
