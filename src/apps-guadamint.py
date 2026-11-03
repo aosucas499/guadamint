@@ -34,7 +34,7 @@ REPO_URL = "https://github.com/aosucas499/guadamint.git"
 REPO_BRANCH = "eos"
 SCRIPT_SRC = os.path.join(REPO_DIR, "src/apps-guadamint.py")
 SCRIPT_BIN = "/usr/bin/apps-guadamint.py"
-RUTA_SCRIPTS_REPO = "/opt/guadamint/src/scripts"
+RUTA_SCRIPTS_REPO = os.path.join(REPO_DIR, "src/scripts")
 RUTA_IMAGES_REPO = os.path.join(REPO_DIR, "images")
 
 CATALOGO = [
@@ -45,7 +45,7 @@ CATALOGO = [
                 "id": "openboard", 
                 "nombre": "Openboard", 
                 "desc": "Aplicación de pizarra interactiva", 
-                "icono": "openboard"
+                "icono": "input-tablet"
             },
         ]
     },
@@ -164,15 +164,31 @@ class FilaApp(Gtk.ListBoxRow):
         box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
         box.set_border_width(10)
         
+        # Crear widget de imagen forzado a caja fija de 48x48 px
         icon = Gtk.Image()
+        icon.set_size_request(48, 48)
         icon.set_pixel_size(48)
+        
         icono_nombre = app_data["icono"]
-        if os.path.isabs(icono_nombre) and os.path.exists(icono_nombre):
-             icon.set_from_file(icono_nombre)
-        elif Gtk.IconTheme.get_default().has_icon(icono_nombre):
-            icon.set_from_icon_name(icono_nombre, Gtk.IconSize.DIALOG)
-        else:
-            icon.set_from_icon_name("system-software-install", Gtk.IconSize.DIALOG)
+        cargado = False
+        
+        # 1. Intentar cargar archivo de imagen local (.png / .svg) escalándolo a máximo 48x48
+        if os.path.exists(icono_nombre):
+            try:
+                pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_scale(icono_nombre, 48, 48, True)
+                icon.set_from_pixbuf(pixbuf)
+                cargado = True
+            except Exception as e:
+                log(f"Error cargando archivo {icono_nombre}: {e}")
+
+        # 2. Si es un nombre del tema GTK (ej: 'openboard'), usar la lógica y fallback originales
+        if not cargado:
+            theme = Gtk.IconTheme.get_default()
+            if theme.has_icon(icono_nombre):
+                icon.set_from_icon_name(icono_nombre, Gtk.IconSize.DIALOG)
+            else:
+                icon.set_from_icon_name("system-software-install", Gtk.IconSize.DIALOG)
+
         box.pack_start(icon, False, False, 0)
 
         vbox_text = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
@@ -383,7 +399,6 @@ class GuadaStoreWindow(Gtk.Window):
             threading.Thread(target=row.check_installed).start()
 
 def main():
-    # Asignar el nombre del programa para que el Dock de Ubuntu lo identifique
     GLib.set_prgname("apps-guadamint.py")
     GLib.set_application_name(TITULO_APP)
     
