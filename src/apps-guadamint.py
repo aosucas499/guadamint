@@ -444,7 +444,7 @@ def main():
     # --- COMPROBAR CONEXIÓN AQUÍ ---
     if not comprobar_conexion():
         # Opcional: puedes salir con sys.exit(1) si la app requiere internet obligatoriamente
-        pass
+        sys.exit(0)
         
     elevar_a_root()
     try: auto_update()
