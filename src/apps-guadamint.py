@@ -10,6 +10,8 @@ import shutil
 import grp
 import time
 import datetime
+import socket
+import urllib.request
 
 # ==============================================================================
 # CONFIGURACIÓN
@@ -126,6 +128,20 @@ def hay_bloqueo_apt():
         if subprocess.run(["fuser", lock], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode == 0:
             return True
     return False
+
+def comprobar_conexion():
+    """Comprueba si hay internet y muestra una alerta con Zenity si falla."""
+    try:
+        urllib.request.urlopen('https://www.google.com', timeout=3)
+        return True
+    except urllib.request.URLError:
+        # Ventana de error con Zenity si no hay red
+        subprocess.run([
+            "zenity", "--error", 
+            "--title=Sin conexión", 
+            "--text=No se ha podido detectar conexión a Internet. Algunas funciones pueden fallar."
+        ])
+        return False
 
 # ==============================================================================
 # AUTO-UPDATE
@@ -414,6 +430,11 @@ def main():
         dialog.destroy()
         sys.exit(0)
 
+    # --- COMPROBAR CONEXIÓN AQUÍ ---
+    if not comprobar_conexion():
+        # Opcional: puedes salir con sys.exit(1) si la app requiere internet obligatoriamente
+        pass
+        
     elevar_a_root()
     try: auto_update()
     except: pass
