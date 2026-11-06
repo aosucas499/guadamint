@@ -12,8 +12,8 @@ Versión optimizada y basada en la distribución oficial [**EducaAndOS v2**](htt
 * **Instalación Sencilla y Dual Boot:** Mismo proceso de instalación que la versión oficial, con detección e integración automática de **Windows** para arranque dual.
 * **Gestión de Usuarios:**
   * **`usuario`**: Cuenta estándar de uso diario con permisos `sudo`.
-  * **`administrador`**: Cuenta de administración del sistema (contraseña: `root`).
-  * **`cuenta idea`**: igual que el sistema oficial, la wifi se carga con vuestra cuenta idea.
+  * **`administrador`**: Cuenta de administración del sistema con derechos **sudo** (contraseña: `root`).
+  * **`usuario IdEA`**: igual que el sistema oficial, la wifi se carga con vuestra cuenta idea y además no la borra en cada inicio. Puedes manterner la wifi **Andared Corporativo** en los usuario locales.
   * 
 ---
 
