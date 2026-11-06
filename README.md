@@ -28,7 +28,10 @@ Entra con esta cuenta y haz con el sistema lo que quieras, como debe ser, como c
 ### 3. Auto-Actualizador propio al Inicio (`update-guadamint`)
 Una aplicación se ejecuta automáticamente al arrancar el equipo para mantener el sistema al día de forma transparente.
 
-### 4. Gestor de Scripts y Configuraciones (`apps-guadamint`)
+### 4. Deshabilitación de la suspensión de la pantalla
+Cada poco rato se activa la suspensión de la pantalla e incluso se sale de la sesión. Deshabilitado como en los paneles.
+
+### 5. Gestor de Scripts y Configuraciones (`apps-guadamint`)
 Herramienta centralizada para aplicar ajustes del sistema e instalar utilidades necesarias en el aula.
 
 #### 📋 Contenido actual de `apps-guadamint`:
