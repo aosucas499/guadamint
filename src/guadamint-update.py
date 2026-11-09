@@ -167,7 +167,7 @@ def restringir_privilegios_usuario():
     #ficheros_a_limpiar = [
     #    "/etc/sudoers.d/90-cloud-init-users",
     #    "/etc/sudoers.d/50-cloud-init"
-    ]
+    #]
     
     # Buscar dinámicamente cualquier regla creada por Subiquity
     sudoers_dir = "/etc/sudoers.d"
