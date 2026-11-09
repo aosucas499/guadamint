@@ -34,7 +34,7 @@ ARCHIVOS_A_SINCRONIZAR = [
     
     # Sudoers y Lanzadores
     ("src/zz-guadamint-update", "/etc/sudoers.d/zz-guadamint-update", 0o440),
-    ("src/guadamint-update.desktop", "/etc/xdg/autostart/guadamint-update.desktop", 0o644),-
+    ("src/guadamint-update.desktop", "/etc/xdg/autostart/guadamint-update.desktop", 0o644),
     ("src/apps-guadamint.desktop", "/usr/share/applications/apps-guadamint.desktop", 0o644),
     
     # Conmutador / Toggle de actualizaciones
