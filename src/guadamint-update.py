@@ -151,6 +151,42 @@ def update_from_git():
         logging.info("Reejecutando script con el nuevo código...")
         os.execv(sys.executable, [sys.executable, SCRIPT_BIN_PATH, '--restarted'])
 
+def restringir_privilegios_usuario():
+    """Garantiza la revocación de sudo para 'usuario' y elimina persistencias de cloud-init/subiquity."""
+    logging.info("Verificando restricción de privilegios para la cuenta 'usuario'...")
+    
+    # 1. Eliminar a 'usuario' del grupo sudo
+    try:
+        subprocess.run(["gpasswd", "-d", "usuario", "sudo"], 
+                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        logging.info("Comprobación de grupo sudo realizada para 'usuario'.")
+    except Exception as error:
+        logging.error(f"Error al desvincular 'usuario' de sudo: {error}")
+
+    # 2. Eliminar ficheros de sudoers generados durante la instalación
+    #ficheros_a_limpiar = [
+    #    "/etc/sudoers.d/90-cloud-init-users",
+    #    "/etc/sudoers.d/50-cloud-init"
+    ]
+    
+    # Buscar dinámicamente cualquier regla creada por Subiquity
+    sudoers_dir = "/etc/sudoers.d"
+    if os.path.exists(sudoers_dir):
+        try:
+            for archivo in os.listdir(sudoers_dir):
+                if "subiquity" in archivo:
+                    ficheros_a_limpiar.append(os.path.join(sudoers_dir, archivo))
+        except Exception as error:
+            logging.error(f"Error al escanear {sudoers_dir}: {error}")
+
+    for ruta in set(ficheros_a_limpiar):
+        if os.path.exists(ruta):
+            try:
+                os.remove(ruta)
+                logging.info(f"Fichero de sudoers eliminado: {ruta}")
+            except Exception as error:
+                logging.error(f"Error al eliminar {ruta}: {error}")
+
 # ==============================================================================
 # 4. EJECUCIÓN PRINCIPAL
 # ==============================================================================
@@ -162,4 +198,5 @@ if __name__ == "__main__":
     logging.info("=== INICIO GUADAMINT UPDATE ===")
     update_from_git()
     check_and_replace_backgrounds()
+    restringir_privilegios_usuario()
     logging.info("=== FIN GUADAMINT UPDATE ===")
