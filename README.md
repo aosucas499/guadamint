@@ -46,6 +46,9 @@ Herramienta centralizada para aplicar ajustes del sistema e instalar utilidades 
 
 ---
 
+### Instalación oficial
+Creador de llaveros usb, opción Ubuntu desde EOS v1 y v2 y Ubuntu. 
+
 ## 🚀 Instalación con Ventoy
 
 Esta versión está optimizada para ser iniciada directamente desde un pendrive preparado con **Ventoy**, sin necesidad de formatear o "quemar" la ISO cada vez. Por ahora no funciona con ETCHER o Creador de USB de ubuntu o educaandos.
