@@ -52,5 +52,4 @@ Herramienta centralizada para aplicar ajustes del sistema e instalar utilidades 
 ✓ Rufus desde Windows.
 
 X No usamos Ventoy o Etcher.
----
 
