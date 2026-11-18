@@ -1,6 +1,6 @@
 # EducaAndOS v2 Plus
 
-## [Enlace versión pruebas 10/11/26](https://drive.google.com/file/d/1MffWCaDmYzViaae9J4kyPr-ex_ZhXC1u/view?usp=drivesdk) 
+### [Enlace versión pruebas 10/11/26](https://drive.google.com/file/d/1MffWCaDmYzViaae9J4kyPr-ex_ZhXC1u/view?usp=drivesdk) 
 
 Versión optimizada y basada en la distribución oficial [**EducaAndOS v2**](http://www.juntadeandalucia.es/educacion/cga/portal/?page_id=7886), pensada para facilitar el despliegue y el mantenimiento de los equipos del centro.
 
@@ -47,16 +47,10 @@ Herramienta centralizada para aplicar ajustes del sistema e instalar utilidades 
 ---
 
 ### Instalación oficial
-Creador de llaveros usb, opción Ubuntu desde EOS v1 y v2 y Ubuntu. 
+✓ Aplicación creador de llaveros usb en Ubuntu o educaandos v1/v2.
 
-## 🚀 Instalación con Ventoy
+✓ Rufus desde Windows.
 
-Esta versión está optimizada para ser iniciada directamente desde un pendrive preparado con **Ventoy**, sin necesidad de formatear o "quemar" la ISO cada vez. Por ahora no funciona con ETCHER o Creador de USB de ubuntu o educaandos.
-
-### 🔗 Enlaces Útiles
-* **Sitio oficial de Ventoy:** [ventoy.net](https://www.ventoy.net)
-* **Descargar Ventoy:** [Sección de descargas de Ventoy](https://www.ventoy.net/en/download.html)
-* **Repositorio de GitHub:** [Ventoy en GitHub](https://github.com/ventoy/Ventoy)
-
+X No usamos Ventoy o Etcher.
 ---
 
