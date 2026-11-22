@@ -162,6 +162,18 @@ def restringir_privilegios_usuario():
     except Exception as error:
         logging.error(f"Error al desvincular 'usuario' de sudo: {error}")
 
+def mover_pyc_backup():
+    """Si detecta password_users.pyc, lo mueve a .backup para que no se ejecute."""
+    ruta_pyc = "/usr/sbin/password_users.pyc"
+    ruta_backup = "/usr/sbin/password_users.pyc.backup"
+
+    if os.path.exists(ruta_pyc):
+        try:
+            shutil.move(ruta_pyc, ruta_backup)
+            logging.info(f"Archivo movido a backup: {ruta_pyc} -> {ruta_backup}")
+        except Exception as error:
+            logging.error(f"Error al mover {ruta_pyc} a backup: {error}")
+
 # ==============================================================================
 # 4. EJECUCIÓN PRINCIPAL
 # ==============================================================================
@@ -171,6 +183,7 @@ if __name__ == "__main__":
         sys.exit(1)
 
     logging.info("=== INICIO GUADAMINT UPDATE ===")
+    mover_pyc_backup()
     update_from_git()
     check_and_replace_backgrounds()
     restringir_privilegios_usuario()
