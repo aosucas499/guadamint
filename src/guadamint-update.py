@@ -5,6 +5,7 @@ import subprocess
 import logging
 import sys
 import filecmp
+from pathlib import Path
 
 # ==============================================================================
 # 1. LOGS Y CONFIGURACIÓN BASE
@@ -174,6 +175,48 @@ def mover_pyc_backup():
         except Exception as error:
             logging.error(f"Error al mover {ruta_pyc} a backup: {error}")
 
+def configurar_sar_security_limpio():
+    src_py = Path("/opt/guadamint/src/password_users.py")
+    dst_py = Path("/usr/sbin/password_users.py")
+    service_path = Path("/usr/lib/systemd/system/sar-security.service")
+
+    service_content = """[Unit]
+Description=EducaAndOSv2 security service
+After=network.target systemd-sysusers.service gdm3.service
+#Before=multi-user.target
+
+[Service]
+ExecStart=/usr/bin/python3 /usr/sbin/password_users.py
+Type=oneshot
+
+[Install]
+WantedBy=multi-user.target
+"""
+
+    # 1. Apartar el .pyc original si reaparece tras una actualización de paquetes
+    mover_pyc_backup()
+
+    # 2. Copiar y asegurar permisos de /usr/sbin/password_users.py si falta o fue modificado
+    if src_py.exists():
+        if not dst_py.exists() or not filecmp.cmp(src_py, dst_py, shallow=False):
+            shutil.copy2(src_py, dst_py)
+        os.chown(dst_py, 0, 0)
+        os.chmod(dst_py, 0o700)
+
+    # 3. Actualizar /usr/lib/systemd/system/sar-security.service si difiere
+    cambios_servicio = False
+    if not service_path.exists() or service_path.read_text(encoding="utf-8") != service_content:
+        service_path.write_text(service_content, encoding="utf-8")
+        os.chown(service_path, 0, 0)
+        os.chmod(service_path, 0o644)
+        cambios_servicio = True
+
+    # 4. Recargar systemd si se modificó la unidad y asegurarlo habilitado
+    if cambios_servicio:
+        subprocess.run(["systemctl", "daemon-reload"], check=False)
+
+    subprocess.run(["systemctl", "enable", "sar-security.service"], check=False)
+
 # ==============================================================================
 # 4. EJECUCIÓN PRINCIPAL
 # ==============================================================================
@@ -183,7 +226,7 @@ if __name__ == "__main__":
         sys.exit(1)
 
     logging.info("=== INICIO GUADAMINT UPDATE ===")
-    #mover_pyc_backup()
+    configurar_sar_security_limpio()
     update_from_git()
     check_and_replace_backgrounds()
     restringir_privilegios_usuario()
