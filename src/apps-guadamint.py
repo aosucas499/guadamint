@@ -33,7 +33,7 @@ if os.geteuid() == 0 and not os.path.exists(os.path.dirname(LOG_FILE)):
 # --- AUTO-UPDATE CONFIG Y RUTAS ---
 REPO_DIR = "/opt/guadamint"
 REPO_URL = "https://github.com/aosucas499/guadamint.git"
-REPO_BRANCH = "eos"
+REPO_BRANCH = "testing"
 SCRIPT_SRC = os.path.join(REPO_DIR, "src/apps-guadamint.py")
 SCRIPT_BIN = "/usr/bin/apps-guadamint.py"
 RUTA_SCRIPTS_REPO = os.path.join(REPO_DIR, "src/scripts")
