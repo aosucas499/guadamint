@@ -19,6 +19,9 @@ import urllib.request
 ICONO_APP = "/usr/share/icons/guadamintuz.svg"
 TITULO_APP = "Centro de Software GuadaMint"
 
+CON_ANDARED_PERMANENTE = "Andared_Corporativo_Permanente"
+SSID_ANDARED = "Andared_Corporativo"
+
 # Configuración de Logs
 if os.geteuid() == 0:
     LOG_FILE = "/var/log/guadamint/tienda.log"
@@ -33,7 +36,7 @@ if os.geteuid() == 0 and not os.path.exists(os.path.dirname(LOG_FILE)):
 # --- AUTO-UPDATE CONFIG Y RUTAS ---
 REPO_DIR = "/opt/guadamint"
 REPO_URL = "https://github.com/aosucas499/guadamint.git"
-REPO_BRANCH = "testing"
+REPO_BRANCH = "eos"
 SCRIPT_SRC = os.path.join(REPO_DIR, "src/apps-guadamint.py")
 SCRIPT_BIN = "/usr/bin/apps-guadamint.py"
 RUTA_SCRIPTS_REPO = os.path.join(REPO_DIR, "src/scripts")
@@ -54,6 +57,13 @@ CATALOGO = [
     {
         "categoria": "Scripts y Configuraciones",
         "apps": [
+            {
+                "id": "andared-permanente",
+                "nombre": "Andared corporativo permanente",
+                "desc": "Configura permanentemente Andared_Corporativo para cuentas locales sin borrarse.",
+                "icono": "network-wireless",
+                "tipo": "wifi_sala"
+            },
             {
                 "id": "ubuntu-repos", 
                 "nombre": "Repositorios Temporales de Ubuntu", 
@@ -130,29 +140,189 @@ def hay_bloqueo_apt():
     return False
 
 def comprobar_conexion():
-    """Comprueba si hay internet con socket y muestra una alerta GTK si falla."""
+    """Comprueba si hay internet con socket y muestra un aviso GTK si falla."""
     try:
-        # Comprobamos conexión con un DNS público (Google)
         socket.create_connection(("8.8.8.8", 53), timeout=3)
         return True
     except OSError:
-        # Si no hay red, mostramos un diálogo GTK nativo (sin problemas de display/sesión)
         dialog = Gtk.MessageDialog(
             parent=None,
             flags=Gtk.DialogFlags.MODAL,
-            message_type=Gtk.MessageType.ERROR,
+            message_type=Gtk.MessageType.WARNING,
             buttons=Gtk.ButtonsType.OK,
             text="Sin conexión a Internet"
         )
-        dialog.format_secondary_text("No se ha podido detectar conexión a Internet. Algunas funciones del repositorio pueden fallar.")
-        
-        # Ponerle el icono de tu app si existe
+        dialog.format_secondary_text(
+            "No se ha detectado conexión a Internet.\n"
+            "Si necesitas configurar la red del aula, activa la opción 'Andared corporativo permanente'."
+        )
         if os.path.exists(ICONO_APP):
             dialog.set_icon_from_file(ICONO_APP)
-            
         dialog.run()
         dialog.destroy()
         return False
+
+# ==============================================================================
+# GESTIÓN DE WI-FI ANDARED CORPORATIVO PERMANENTE
+# ==============================================================================
+def perfil_andared_permanente_existe():
+    res = subprocess.run(
+        ["nmcli", "-g", "NAME", "connection", "show", CON_ANDARED_PERMANENTE],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL
+    )
+    return res.returncode == 0
+
+def pedir_credenciales_andared(parent_window):
+    """Muestra un cuadro de diálogo GTK 3 para pedir usuario de sala y contraseña."""
+    dialog = Gtk.Dialog(
+        title="Andared corporativo permanente",
+        transient_for=parent_window,
+        flags=Gtk.DialogFlags.MODAL | Gtk.DialogFlags.DESTROY_WITH_PARENT,
+    )
+    dialog.set_default_size(430, 230)
+    dialog.set_resizable(False)
+    dialog.set_border_width(14)
+    if os.path.exists(ICONO_APP):
+        dialog.set_icon_from_file(ICONO_APP)
+
+    dialog.add_button("Cancelar", Gtk.ResponseType.CANCEL)
+    btn_ok = dialog.add_button("Guardar y conectar", Gtk.ResponseType.OK)
+    btn_ok.get_style_context().add_class("suggested-action")
+    btn_ok.set_can_default(True)
+    btn_ok.grab_default()
+
+    area = dialog.get_content_area()
+    area.set_spacing(12)
+
+    lbl_titulo = Gtk.Label(xalign=0)
+    lbl_titulo.set_markup(
+        "<b>Andared corporativo permanente</b>\n"
+        "<small>Introduce el usuario de sala y su contraseña. La conexión se guardará\n"
+        "en NetworkManager disponible para todas las cuentas locales sin borrarse.</small>"
+    )
+    lbl_titulo.set_line_wrap(True)
+    area.pack_start(lbl_titulo, False, False, 0)
+
+    grid = Gtk.Grid(column_spacing=12, row_spacing=10)
+    area.pack_start(grid, True, True, 4)
+
+    lbl_user = Gtk.Label(label="Usuario de sala:", xalign=0)
+    entry_user = Gtk.Entry()
+    entry_user.set_placeholder_text("Ej. 2900XXXX-sala-01")
+    entry_user.set_hexpand(True)
+    entry_user.set_activates_default(True)
+    grid.attach(lbl_user, 0, 0, 1, 1)
+    grid.attach(entry_user, 1, 0, 1, 1)
+
+    lbl_pass = Gtk.Label(label="Contraseña:", xalign=0)
+    entry_pass = Gtk.Entry()
+    entry_pass.set_visibility(False)
+    entry_pass.set_hexpand(True)
+    entry_pass.set_activates_default(True)
+    grid.attach(lbl_pass, 0, 1, 1, 1)
+    grid.attach(entry_pass, 1, 1, 1, 1)
+
+    chk_ver = Gtk.CheckButton(label="Mostrar contraseña")
+    chk_ver.connect("toggled", lambda w: entry_pass.set_visibility(w.get_active()))
+    grid.attach(chk_ver, 1, 2, 1, 1)
+
+    # Precargar identidad si ya existía una configuración previa
+    res_id = subprocess.run(
+        ["nmcli", "-g", "802-1x.identity", "connection", "show", CON_ANDARED_PERMANENTE],
+        capture_output=True, text=True
+    )
+    if res_id.returncode == 0 and res_id.stdout.strip():
+        entry_user.set_text(res_id.stdout.strip())
+
+    dialog.show_all()
+
+    while True:
+        resp = dialog.run()
+        if resp != Gtk.ResponseType.OK:
+            dialog.destroy()
+            return None
+
+        usuario = entry_user.get_text().strip()
+        password = entry_pass.get_text().strip()
+        if usuario and password:
+            dialog.destroy()
+            return (usuario, password)
+
+        aviso = Gtk.MessageDialog(
+            parent=dialog,
+            flags=Gtk.DialogFlags.MODAL,
+            message_type=Gtk.MessageType.WARNING,
+            buttons=Gtk.ButtonsType.OK,
+            text="Campos incompletos"
+        )
+        aviso.format_secondary_text("Debes introducir tanto el usuario de sala como la contraseña.")
+        aviso.run()
+        aviso.destroy()
+
+def aplicar_andared_permanente(usuario, password):
+    """Crea el perfil permanente en /etc/NetworkManager/system-connections/ y conecta."""
+    subprocess.run(["nmcli", "radio", "wifi", "on"], capture_output=True)
+
+    res_dev = subprocess.run(
+        ["nmcli", "-t", "-f", "DEVICE,TYPE", "device"],
+        capture_output=True, text=True
+    )
+    interfaz = next(
+        (l.split(":")[0] for l in res_dev.stdout.splitlines() if l.endswith(":wifi")),
+        ""
+    )
+    if not interfaz:
+        return False, "No se ha detectado ninguna interfaz Wi-Fi activa en el equipo."
+
+    subprocess.run(["nmcli", "connection", "delete", CON_ANDARED_PERMANENTE], capture_output=True)
+
+    res_add = subprocess.run(
+        [
+            "nmcli", "connection", "add",
+            "type", "wifi",
+            "ifname", interfaz,
+            "con-name", CON_ANDARED_PERMANENTE,
+            "ssid", SSID_ANDARED,
+        ],
+        capture_output=True, text=True
+    )
+    if res_add.returncode != 0:
+        return False, f"Error creando perfil en NetworkManager: {res_add.stderr.strip()}"
+
+    res_mod = subprocess.run(
+        [
+            "nmcli", "connection", "modify", CON_ANDARED_PERMANENTE,
+            "wifi-sec.key-mgmt", "wpa-eap",
+            "802-1x.eap", "ttls",
+            "802-1x.phase2-auth", "gtc",
+            "802-1x.identity", usuario,
+            "802-1x.password", password,
+            "802-1x.ca-cert", "",
+            "802-1x.system-ca-certs", "no",
+            "802-1x.password-flags", "0",
+            "connection.permissions", "",
+            "connection.autoconnect", "yes",
+            "connection.autoconnect-priority", "-10",
+        ],
+        capture_output=True, text=True
+    )
+    if res_mod.returncode != 0:
+        return False, f"Error aplicando parámetros 802.1X: {res_mod.stderr.strip()}"
+
+    ruta_nm = f"/etc/NetworkManager/system-connections/{CON_ANDARED_PERMANENTE}.nmconnection"
+    if os.path.exists(ruta_nm):
+        os.chmod(ruta_nm, 0o600)
+
+    res_up = subprocess.run(
+        ["nmcli", "--wait", "15", "connection", "up", CON_ANDARED_PERMANENTE],
+        capture_output=True, text=True
+    )
+    if res_up.returncode != 0:
+        err = res_up.stderr.strip() or "Verifica usuario, contraseña o cobertura Wi-Fi."
+        return False, f"Perfil guardado en el sistema, pero falló la conexión:\n{err}"
+
+    return True, ""
 
 # ==============================================================================
 # AUTO-UPDATE
@@ -191,7 +361,6 @@ class FilaApp(Gtk.ListBoxRow):
         box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
         box.set_border_width(10)
         
-        # Crear widget de imagen forzado a caja fija de 48x48 px
         icon = Gtk.Image()
         icon.set_size_request(48, 48)
         icon.set_pixel_size(48)
@@ -199,7 +368,6 @@ class FilaApp(Gtk.ListBoxRow):
         icono_nombre = app_data["icono"]
         cargado = False
         
-        # 1. Intentar cargar archivo de imagen local (.png / .svg) escalándolo a máximo 48x48
         if os.path.exists(icono_nombre):
             try:
                 pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_scale(icono_nombre, 48, 48, True)
@@ -208,7 +376,6 @@ class FilaApp(Gtk.ListBoxRow):
             except Exception as e:
                 log(f"Error cargando archivo {icono_nombre}: {e}")
 
-        # 2. Si es un nombre del tema GTK (ej: 'openboard'), usar la lógica y fallback originales
         if not cargado:
             theme = Gtk.IconTheme.get_default()
             if theme.has_icon(icono_nombre):
@@ -244,7 +411,9 @@ class FilaApp(Gtk.ListBoxRow):
     def check_installed(self):
         is_installed = False
         try:
-            if "script_install" in self.app_data:
+            if self.app_data.get("tipo") == "wifi_sala":
+                is_installed = perfil_andared_permanente_existe()
+            elif "script_install" in self.app_data:
                 ruta_script = os.path.join(RUTA_SCRIPTS_REPO, self.app_data["script_install"])
                 if os.path.exists(ruta_script):
                     res = subprocess.run(["/bin/bash", ruta_script, "status"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
@@ -267,6 +436,29 @@ class FilaApp(Gtk.ListBoxRow):
         return False
 
     def on_switch_activated(self, switch, state):
+        if self.app_data.get("tipo") == "wifi_sala":
+            if state:
+                credenciales = pedir_credenciales_andared(self.ventana_padre)
+                if not credenciales:
+                    self.update_switch_state(False)
+                    return True
+                self.switch.set_sensitive(False)
+                self.spinner.start()
+                self.switch.set_state(True)
+                threading.Thread(
+                    target=self.run_wifi_sala_action,
+                    args=(True, credenciales[0], credenciales[1])
+                ).start()
+            else:
+                self.switch.set_sensitive(False)
+                self.spinner.start()
+                self.switch.set_state(False)
+                threading.Thread(
+                    target=self.run_wifi_sala_action,
+                    args=(False, "", "")
+                ).start()
+            return True
+
         self.switch.set_sensitive(False)
         self.spinner.start()
         
@@ -285,11 +477,59 @@ class FilaApp(Gtk.ListBoxRow):
         threading.Thread(target=self.run_apt_action, args=(action,)).start()
         return True
 
+    def run_wifi_sala_action(self, activar, usuario, password):
+        log(f"Iniciando configuración Andared corporativo permanente (activar={activar})...")
+        if activar:
+            ok, err = aplicar_andared_permanente(usuario, password)
+            if ok:
+                log(f"Perfil {CON_ANDARED_PERMANENTE} configurado y conectado correctamente.")
+            else:
+                log(f"Aviso configurando {CON_ANDARED_PERMANENTE}: {err}")
+            estado_final = perfil_andared_permanente_existe()
+            GLib.idle_add(self.finish_wifi_action, ok, estado_final, err)
+        else:
+            subprocess.run(["nmcli", "connection", "delete", CON_ANDARED_PERMANENTE], capture_output=True)
+            log(f"Perfil {CON_ANDARED_PERMANENTE} eliminado.")
+            GLib.idle_add(self.finish_wifi_action, True, False, "")
+
+    def finish_wifi_action(self, ok, estado_real, error_msg=""):
+        self.spinner.stop()
+        self.switch.set_sensitive(True)
+        self.update_switch_state(estado_real)
+
+        if ok:
+            self.notificar_escritorio(f"Operación completada: {self.app_data['nombre']}")
+        elif error_msg:
+            self.mostrar_error(error_msg)
+        return False
+
     def mostrar_error(self, mensaje):
         dialog = Gtk.MessageDialog(parent=self.ventana_padre, flags=Gtk.DialogFlags.MODAL, message_type=Gtk.MessageType.ERROR, buttons=Gtk.ButtonsType.OK, text="Aviso")
         dialog.format_secondary_text(mensaje)
         dialog.run()
         dialog.destroy()
+
+    def notificar_escritorio(self, texto):
+        user = os.environ.get('SUDO_USER', os.environ.get('USER'))
+        if not user or user == 'root':
+            try:
+                user = subprocess.check_output(
+                    ["loginctl", "list-sessions"], text=True
+                ).split("\n")[1].split()[2]
+            except:
+                user = "administrador"
+
+        cmd = [
+            'systemd-run',
+            f'--machine={user}@.host',
+            '--user',
+            'notify-send',
+            '-a', 'GuadaMint Store',
+            '-i', 'system-software-update',
+            'GuadaMint Store',
+            texto
+        ]
+        subprocess.Popen(cmd, stderr=subprocess.DEVNULL)
 
     def run_apt_action(self, action):
         log(f"Iniciando acción: {action} {self.pkg_name}")
@@ -344,26 +584,7 @@ class FilaApp(Gtk.ListBoxRow):
         self.switch.set_sensitive(True)
         
         if success:
-            user = os.environ.get('SUDO_USER', os.environ.get('USER'))
-            if not user or user == 'root':
-                try:
-                    user = subprocess.check_output(
-                        ["loginctl", "list-sessions"], text=True
-                    ).split("\n")[1].split()[2]
-                except:
-                    user = "administrador"
-
-            cmd = [
-                'systemd-run',
-                f'--machine={user}@.host',
-                '--user',
-                'notify-send',
-                '-a', 'GuadaMint Store',
-                '-i', 'system-software-update',
-                'GuadaMint Store',
-                f'Operación completada: {self.app_data["nombre"]}'
-            ]
-            subprocess.Popen(cmd, stderr=subprocess.DEVNULL)
+            self.notificar_escritorio(f'Operación completada: {self.app_data["nombre"]}')
         else:
             self.switch.handler_block(self.handler_id)
             self.switch.set_active(not intended_state)
@@ -441,14 +662,13 @@ def main():
         dialog.destroy()
         sys.exit(0)
 
-    # --- COMPROBAR CONEXIÓN AQUÍ ---
-    if not comprobar_conexion():
-        # Opcional: puedes salir con sys.exit(1) si la app requiere internet obligatoriamente
-        sys.exit(0)
+    # Avisar si no hay red, pero permitir abrir la tienda para poder configurar la Wi-Fi
+    hay_red = comprobar_conexion()
         
     elevar_a_root()
-    try: auto_update()
-    except: pass
+    if hay_red:
+        try: auto_update()
+        except: pass
     
     win = GuadaStoreWindow()
     win.connect("destroy", Gtk.main_quit)
