@@ -183,7 +183,7 @@ if __name__ == "__main__":
         sys.exit(1)
 
     logging.info("=== INICIO GUADAMINT UPDATE ===")
-    mover_pyc_backup()
+    #mover_pyc_backup()
     update_from_git()
     check_and_replace_backgrounds()
     restringir_privilegios_usuario()
