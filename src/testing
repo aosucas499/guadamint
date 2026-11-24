@@ -1,0 +1,15 @@
+python3 -c '
+import marshal, types
+with open("/usr/sbin/password_users.pyc.backup", "rb") as f:
+    f.seek(16)
+    c = marshal.load(f)
+def walk(co):
+    print("FUNC:", co.co_name, "-> NAMES:", co.co_names)
+    for x in co.co_consts:
+        if isinstance(x, types.CodeType): walk(x)
+        elif isinstance(x, (str, bytes)): print("  STR:", repr(x))
+walk(c)
+'
+
+python3 -c 'import marshal, dis; f=open("/usr/sbin/password_users.pyc.backup","rb"); f.seek(16); dis.dis(marshal.load(f))' > /tmp/password_users_dis.txt
+less /tmp/password_users_dis.txt
