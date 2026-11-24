@@ -261,7 +261,7 @@ def pedir_credenciales_andared(parent_window):
         aviso.destroy()
 
 def aplicar_andared_permanente(usuario, password):
-    """Crea el perfil permanente en /etc/NetworkManager/system-connections/ y conecta."""
+    """Crea el perfil permanente en /etc/NetworkManager/system-connections/ aunque no haya hardware Wi-Fi."""
     subprocess.run(["nmcli", "radio", "wifi", "on"], capture_output=True)
 
     res_dev = subprocess.run(
@@ -272,8 +272,8 @@ def aplicar_andared_permanente(usuario, password):
         (l.split(":")[0] for l in res_dev.stdout.splitlines() if l.endswith(":wifi")),
         ""
     )
-    if not interfaz:
-        return False, "No se ha detectado ninguna interfaz Wi-Fi activa en el equipo."
+    # Si no hay interfaz física (ej. VirtualBox), "*" guarda el perfil válido para cualquier tarjeta futura
+    ifname_valor = interfaz if interfaz else "*"
 
     subprocess.run(["nmcli", "connection", "delete", CON_ANDARED_PERMANENTE], capture_output=True)
 
@@ -281,7 +281,7 @@ def aplicar_andared_permanente(usuario, password):
         [
             "nmcli", "connection", "add",
             "type", "wifi",
-            "ifname", interfaz,
+            "ifname", ifname_valor,
             "con-name", CON_ANDARED_PERMANENTE,
             "ssid", SSID_ANDARED,
         ],
@@ -314,6 +314,10 @@ def aplicar_andared_permanente(usuario, password):
     if os.path.exists(ruta_nm):
         os.chmod(ruta_nm, 0o600)
 
+    # Si no hay tarjeta Wi-Fi (VirtualBox), damos por válido el guardado del perfil
+    if not interfaz:
+        return True, ""
+
     res_up = subprocess.run(
         ["nmcli", "--wait", "15", "connection", "up", CON_ANDARED_PERMANENTE],
         capture_output=True, text=True
@@ -323,7 +327,6 @@ def aplicar_andared_permanente(usuario, password):
         return False, f"Perfil guardado en el sistema, pero falló la conexión:\n{err}"
 
     return True, ""
-
 # ==============================================================================
 # AUTO-UPDATE
 # ==============================================================================
