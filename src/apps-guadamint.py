@@ -261,7 +261,7 @@ def pedir_credenciales_andared(parent_window):
         aviso.destroy()
 
 def aplicar_andared_permanente(usuario, password):
-    """Crea el perfil permanente en /etc/NetworkManager/system-connections/ aunque no haya hardware Wi-Fi."""
+    """Registra Andared_Corporativo_Permanente vía nmcli (persistente en Netplan/NM)."""
     subprocess.run(["nmcli", "radio", "wifi", "on"], capture_output=True)
 
     res_dev = subprocess.run(
@@ -272,7 +272,6 @@ def aplicar_andared_permanente(usuario, password):
         (l.split(":")[0] for l in res_dev.stdout.splitlines() if l.endswith(":wifi")),
         ""
     )
-    # Si no hay interfaz física (ej. VirtualBox), "*" guarda el perfil válido para cualquier tarjeta futura
     ifname_valor = interfaz if interfaz else "*"
 
     subprocess.run(["nmcli", "connection", "delete", CON_ANDARED_PERMANENTE], capture_output=True)
@@ -284,6 +283,7 @@ def aplicar_andared_permanente(usuario, password):
             "ifname", ifname_valor,
             "con-name", CON_ANDARED_PERMANENTE,
             "ssid", SSID_ANDARED,
+            "save", "yes",
         ],
         capture_output=True, text=True
     )
@@ -310,11 +310,6 @@ def aplicar_andared_permanente(usuario, password):
     if res_mod.returncode != 0:
         return False, f"Error aplicando parámetros 802.1X: {res_mod.stderr.strip()}"
 
-    ruta_nm = f"/etc/NetworkManager/system-connections/{CON_ANDARED_PERMANENTE}.nmconnection"
-    if os.path.exists(ruta_nm):
-        os.chmod(ruta_nm, 0o600)
-
-    # Si no hay tarjeta Wi-Fi (VirtualBox), damos por válido el guardado del perfil
     if not interfaz:
         return True, ""
 
