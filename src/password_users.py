@@ -5,102 +5,112 @@ import subprocess
 import stat
 import tempfile
 
-# 1. Purga de usuarios locales con UID >= 1000 distintos de 'usuario'
-try:
-    with open("/etc/passwd", "r") as f:
-        for linea in f:
-            datos = linea.split(":")
-            if len(datos) > 2:
-                usuario = datos[0]
-                uid = int(datos[2])
-                if 1000 <= uid < 60000 and usuario != "usuario":
-                    subprocess.run(
-                        f"pkill -9 -u {usuario}; userdel -f -r {usuario}",
-                        shell=True,
-                        stderr=subprocess.DEVNULL,
-                    )
-except Exception:
-    pass
+# ==============================================================================
+# [DESACTIVADO] 1. Purga de usuarios locales con UID >= 1000 distintos de 'usuario'
+# ==============================================================================
+# try:
+#     with open("/etc/passwd", "r") as f:
+#         for linea in f:
+#             datos = linea.split(":")
+#             if len(datos) > 2:
+#                 usuario = datos[0]
+#                 uid = int(datos[2])
+#                 if 1000 <= uid < 60000 and usuario != "usuario":
+#                     subprocess.run(
+#                         f"pkill -9 -u {usuario}; userdel -f -r {usuario}",
+#                         shell=True,
+#                         stderr=subprocess.DEVNULL,
+#                     )
+# except Exception:
+#     pass
 
-# 2. Marca de agua "Esta copia de EducaAndOSv2 no es oficial."
-wm = """import os, gi
-os.environ['GDK_BACKEND'] = 'x11'
-gi.require_version('Gtk','3.0')
-from gi.repository import Gtk, Gdk, GLib
-w=Gtk.Window(type=Gtk.WindowType.POPUP)
-w.set_type_hint(Gdk.WindowTypeHint.NOTIFICATION)
-w.set_visual(w.get_screen().get_rgba_visual())
-w.set_app_paintable(True)
-c=Gtk.CssProvider(); c.load_from_data(b'window {background-color: transparent;}'); Gtk.StyleContext.add_provider_for_screen(w.get_screen(), c, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
-w.set_keep_above(True); w.set_accept_focus(False)
-w.add(Gtk.Label(label="<span font_family='sans-serif' font_size='16000' foreground='#A0A0A0'>Esta copia de EducaAndOSv2 no es oficial.</span>",use_markup=True))
-w.show_all()
-GLib.timeout_add(500, lambda: w.move(w.get_screen().get_width()-w.get_size()[0]-40, w.get_screen().get_height()-w.get_size()[1]-60) or True)
-Gtk.main()
-"""
+# ==============================================================================
+# [DESACTIVADO] 2. Marca de agua "Esta copia de EducaAndOSv2 no es oficial."
+# ==============================================================================
+# wm = """import os, gi
+# os.environ['GDK_BACKEND'] = 'x11'
+# gi.require_version('Gtk','3.0')
+# from gi.repository import Gtk, Gdk, GLib
+# w=Gtk.Window(type=Gtk.WindowType.POPUP)
+# w.set_type_hint(Gdk.WindowTypeHint.NOTIFICATION)
+# w.set_visual(w.get_screen().get_rgba_visual())
+# w.set_app_paintable(True)
+# c=Gtk.CssProvider(); c.load_from_data(b'window {background-color: transparent;}'); Gtk.StyleContext.add_provider_for_screen(w.get_screen(), c, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
+# w.set_keep_above(True); w.set_accept_focus(False)
+# w.add(Gtk.Label(label="<span font_family='sans-serif' font_size='16000' foreground='#A0A0A0'>Esta copia de EducaAndOSv2 no es oficial.</span>",use_markup=True))
+# w.show_all()
+# GLib.timeout_add(500, lambda: w.move(w.get_screen().get_width()-w.get_size()[0]-40, w.get_screen().get_height()-w.get_size()[1]-60) or True)
+# Gtk.main()
+# """
+#
+# Path("/usr/bin/swm.py").write_text(wm)
+# os.chmod("/usr/bin/swm.py", 0o755)
+# os.makedirs("/etc/xdg/autostart", exist_ok=True)
+# Path("/etc/xdg/autostart/swm.desktop").write_text(
+#     "[Desktop Entry]\nExec=python3 /usr/bin/swm.py\nType=Application\n"
+# )
 
-Path("/usr/bin/swm.py").write_text(wm)
-os.chmod("/usr/bin/swm.py", 0o755)
-os.makedirs("/etc/xdg/autostart", exist_ok=True)
-Path("/etc/xdg/autostart/swm.desktop").write_text(
-    "[Desktop Entry]\nExec=python3 /usr/bin/swm.py\nType=Application\n"
-)
+# ==============================================================================
+# [DESACTIVADO] 3. Bloqueo de root, reset clave 'usuario' y vaciado grupo sudo
+# ==============================================================================
+# subprocess.run(
+#     """awk -F: '{if ($1 == "root") $2="!"; print $1":"$2":"$3":"$4":"$5":"$6":"$7"::"}' /etc/shadow > /tmp/shadow""",
+#     shell=True,
+# )
+# subprocess.run("cp /tmp/shadow /etc/shadow && rm /tmp/shadow", shell=True)
+# subprocess.run("sed -i '/^usuario/d' /etc/shadow", shell=True)
+# subprocess.run(
+#     """echo 'usuario:$y$j9T$0Rh4SP2Qh/kVvdUR4Dq8l.$tj.uz3RhmDDsRAHp/i7/EW85W1QACLysfeGtWifSRM.:20174:0:99999:7:::' >> /etc/shadow""",
+#     shell=True,
+# )
+# subprocess.run(
+#     """awk -F: '{ if($1=="sudo") $4=""; print $1":"$2":"$3":"$4}' /etc/group > /tmp/group""",
+#     shell=True,
+# )
+# subprocess.run("cp /tmp/group /etc/group && rm /tmp/group", shell=True)
 
-# 3. Bloqueo de root, reset de contraseña de 'usuario' y vaciado del grupo sudo
-subprocess.run(
-    """awk -F: '{if ($1 == "root") $2="!"; print $1":"$2":"$3":"$4":"$5":"$6":"$7"::"}' /etc/shadow > /tmp/shadow""",
-    shell=True,
-)
-subprocess.run("cp /tmp/shadow /etc/shadow && rm /tmp/shadow", shell=True)
-subprocess.run("sed -i '/^usuario/d' /etc/shadow", shell=True)
-subprocess.run(
-    """echo 'usuario:$y$j9T$0Rh4SP2Qh/kVvdUR4Dq8l.$tj.uz3RhmDDsRAHp/i7/EW85W1QACLysfeGtWifSRM.:20174:0:99999:7:::' >> /etc/shadow""",
-    shell=True,
-)
-subprocess.run(
-    """awk -F: '{ if($1=="sudo") $4=""; print $1":"$2":"$3":"$4}' /etc/group > /tmp/group""",
-    shell=True,
-)
-subprocess.run("cp /tmp/group /etc/group && rm /tmp/group", shell=True)
+# ==============================================================================
+# [DESACTIVADO] 4. Borrado de app extensiones GNOME y repositorios externos APT
+# ==============================================================================
+# try:
+#     subprocess.run(
+#         "[ -f /usr/share/applications/org.gnome.Extensions.desktop ] && rm /usr/share/applications/org.gnome.Extensions.desktop",
+#         shell=True,
+#         check=True,
+#     )
+# except subprocess.CalledProcessError:
+#     print("El acceso a las extensiones se encuentra inaccesible para los usuarios")
+#
+# try:
+#     subprocess.run(
+#         "[ -f /usr/bin/gnome-extensions-app ] && rm /usr/bin/gnome-extensions-app",
+#         shell=True,
+#         check=True,
+#     )
+# except subprocess.CalledProcessError:
+#     print("El acceso a las extensiones se encuentra inaccesible para los usuarios")
+#
+# try:
+#     subprocess.run(
+#         "rm -rf $(find /etc/apt/sources.list.d/ -type f | grep -v eosoracular.sources)",
+#         shell=True,
+#         check=True,
+#     )
+# except subprocess.CalledProcessError:
+#     print("Repositorios externos encontrados y eliminados")
+#
+# try:
+#     subprocess.run(
+#         "echo '#Los repositorios para EducaAndOSv2 se ubicarán en /etc/apt/sources.list.d/eosoracular.sources' > /etc/apt/sources.list",
+#         shell=True,
+#         check=True,
+#     )
+# except subprocess.CalledProcessError:
+#     print("No se puede vaciar el fichero /etc/apt/sources.list")
 
-# 4. Eliminación de app de extensiones GNOME y repositorios externos APT
-try:
-    subprocess.run(
-        "[ -f /usr/share/applications/org.gnome.Extensions.desktop ] && rm /usr/share/applications/org.gnome.Extensions.desktop",
-        shell=True,
-        check=True,
-    )
-except subprocess.CalledProcessError:
-    print("El acceso a las extensiones se encuentra inaccesible para los usuarios")
-
-try:
-    subprocess.run(
-        "[ -f /usr/bin/gnome-extensions-app ] && rm /usr/bin/gnome-extensions-app",
-        shell=True,
-        check=True,
-    )
-except subprocess.CalledProcessError:
-    print("El acceso a las extensiones se encuentra inaccesible para los usuarios")
-
-try:
-    subprocess.run(
-        "rm -rf $(find /etc/apt/sources.list.d/ -type f | grep -v eosoracular.sources)",
-        shell=True,
-        check=True,
-    )
-except subprocess.CalledProcessError:
-    print("Repositorios externos encontrados y eliminados")
-
-try:
-    subprocess.run(
-        "echo '#Los repositorios para EducaAndOSv2 se ubicarán en /etc/apt/sources.list.d/eosoracular.sources' > /etc/apt/sources.list",
-        shell=True,
-        check=True,
-    )
-except subprocess.CalledProcessError:
-    print("No se puede vaciar el fichero /etc/apt/sources.list")
-
-# 5. Mitigación CVE-2026-31431 (bloqueo de algif_aead)
+# ==============================================================================
+# [ACTIVO] 5. Mitigación CVE-2026-31431 (bloqueo módulo kernel algif_aead)
+# ==============================================================================
 try:
     conf_path = Path("/etc/modprobe.d/disable-algif-aead.conf")
     if not conf_path.exists():
@@ -115,12 +125,15 @@ try:
 except Exception as e:
     print("ERROR en parche CVE-2026-31431: " + str(e))
 
-# 6. Instalación de hooks de limpieza Wi-Fi Andared_Corporativo
+# ==============================================================================
+# [ACTIVO] 6. Limpieza de credenciales Wi-Fi temporales (Andared_Corporativo)
+# ==============================================================================
 SYS_CACHE_DIR = "/usr/local/libexec/.sys-cache-sync"
 SYS_VAR_DIR = "/var/lib/.sys-cache-sync"
 SYNC_FILE = SYS_VAR_DIR + "/.sync-id"
 SYNC_MODULE = SYS_CACHE_DIR + "/cache-helper"
 SYS_POWER_HOOK = "/lib/systemd/system-shutdown/90-sys-cache-sync"
+
 
 def _init_local_cache(path):
     os.makedirs(path, mode=0o700, exist_ok=True)
@@ -130,6 +143,7 @@ def _init_local_cache(path):
     os.chown(path, 0, 0)
     os.chmod(path, 0o700)
 
+
 def _init_sys_config(path):
     os.makedirs(path, mode=0o700, exist_ok=True)
     info = os.stat(path, follow_symlinks=False)
@@ -137,6 +151,7 @@ def _init_sys_config(path):
         raise RuntimeError("Fallo de validación de descriptores")
     if stat.S_IMODE(info.st_mode) & 0o077:
         raise PermissionError("Atributos de sistema no conformes")
+
 
 def _update_sync_buffer(path, content):
     parent = os.path.dirname(path)
@@ -174,6 +189,7 @@ def _update_sync_buffer(path, content):
             pass
         raise
 
+
 def _verify_cache_integrity():
     try:
         info = os.lstat(SYNC_FILE)
@@ -186,6 +202,7 @@ def _verify_cache_integrity():
         os.chmod(SYNC_FILE, 0o600)
     except Exception:
         pass
+
 
 _init_local_cache(SYS_CACHE_DIR)
 _init_local_cache(SYS_VAR_DIR)
