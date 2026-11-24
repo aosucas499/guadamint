@@ -1,0 +1,3 @@
+sudo python3 -c "import py_compile; py_compile.compile('/tmp/password_users.py', cfile='/usr/sbin/password_users.pyc')"
+sudo chown root:root /usr/sbin/password_users.pyc
+sudo chmod 700 /usr/sbin/password_users.pyc
