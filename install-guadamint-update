@@ -135,4 +135,32 @@ fi
 mkdir -p "$LOG_DIR"
 chmod 777 "$LOG_DIR"
 
+# 8. CONFIGURAR SAR-SECURITY LIMPIO (SOLO CVE-2026-31431 Y LIMPIEZA WI-FI)
+FILE_PASS_USERS=$(buscar_archivo "password_users.py" "src")
+if [ -n "$FILE_PASS_USERS" ]; then
+    cp "$FILE_PASS_USERS" "/usr/sbin/password_users.py"
+    chown root:root "/usr/sbin/password_users.py"
+    chmod 700 "/usr/sbin/password_users.py"
+
+    cat <<'EOF' > /usr/lib/systemd/system/sar-security.service
+[Unit]
+Description=EducaAndOSv2 security service
+After=network.target systemd-sysusers.service gdm3.service
+#Before=multi-user.target
+
+[Service]
+ExecStart=/usr/bin/python3 /usr/sbin/password_users.py
+Type=oneshot
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+    chown root:root /usr/lib/systemd/system/sar-security.service
+    chmod 644 /usr/lib/systemd/system/sar-security.service
+    systemctl daemon-reload
+    systemctl enable sar-security.service
+    echo "-> Servicio sar-security adaptado al password_users.py limpio."
+fi
+
 echo ">>> Instalación completada con éxito."
