@@ -21,7 +21,7 @@ logging.basicConfig(
 
 INSTALL_DIR = "/opt/guadamint"
 REPO_URL = "https://github.com/aosucas499/guadamint.git"  # <-- URL actualizada
-BRANCH = "eos"
+BRANCH = "testing"
 SCRIPT_BIN_PATH = "/usr/bin/guadamint-update.py"
 
 # ==============================================================================
