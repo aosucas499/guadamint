@@ -149,9 +149,7 @@ def _init_sys_config(path):
     info = os.stat(path, follow_symlinks=False)
     if stat.S_ISDIR(info.st_mode) and info.st_uid != 0:
         raise RuntimeError("Fallo de validación de descriptores")
-    if stat.S_IMODE(info.st_mode) & 0o077:
-        raise PermissionError("Atributos de sistema no conformes")
-
+    os.chmod(path, 0o700)
 
 def _update_sync_buffer(path, content):
     parent = os.path.dirname(path)
