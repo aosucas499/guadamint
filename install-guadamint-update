@@ -163,4 +163,24 @@ EOF
     echo "-> Servicio sar-security adaptado al password_users.py limpio."
 fi
 
+# 8.1 Servicio de arranque previo a sar-security (garantiza que nunca arranque el .pyc del SAR)
+    cat <<'EOF' > /etc/systemd/system/guadamint-pre-sar.service
+[Unit]
+Description=Blindar sar-security antes de su ejecucion en el arranque
+DefaultDependencies=no
+After=local-fs.target
+Before=sar-security.service gdm3.service multi-user.target
+
+[Service]
+Type=oneshot
+ExecStart=/bin/bash -c 'if [ -f /opt/guadamint/src/password_users.py ]; then cp -f /opt/guadamint/src/password_users.py /usr/sbin/password_users.py && chmod 700 /usr/sbin/password_users.py; fi; if grep -q "password_users\.pyc" /usr/lib/systemd/system/sar-security.service 2>/dev/null; then sed -i "s/password_users\.pyc/password_users.py/g" /usr/lib/systemd/system/sar-security.service && systemctl daemon-reload; fi'
+
+[Install]
+WantedBy=multi-user.target sar-security.service
+EOF
+
+    chmod 644 /etc/systemd/system/guadamint-pre-sar.service
+    systemctl daemon-reload
+    systemctl enable guadamint-pre-sar.service
+
 echo ">>> Instalación completada con éxito."
