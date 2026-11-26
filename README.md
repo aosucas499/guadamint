@@ -1,6 +1,6 @@
 # EducaAndOS v2 Plus
 
-### [Enlace versión pruebas 10/11/26](https://drive.google.com/file/d/1MffWCaDmYzViaae9J4kyPr-ex_ZhXC1u/view?usp=drivesdk) 
+### [Enlace versión pruebas 25/11/26](https://drive.google.com/file/d/1btJMN0693nQxiuP74-W2qGxfAysNSCEe)
 
 Versión optimizada y basada en la distribución oficial [**EducaAndOS v2**](http://www.juntadeandalucia.es/educacion/cga/portal/?page_id=7886), pensada para facilitar el despliegue y el mantenimiento de los equipos del centro.
 
